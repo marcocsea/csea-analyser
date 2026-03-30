@@ -1,316 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CSEA · Trading Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#0a0c0f;--bg2:#111318;--bg3:#181b22;--bg4:#1e2129;
-  --border:#ffffff0f;--border2:#ffffff18;
-  --text:#e8eaf0;--text2:#8892a4;--text3:#5a6478;
-  --gold:#f0a832;--green:#00c896;--red:#f04060;
-  --blue:#4488ff;--purple:#9966ff;
-  --font:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace;
-}
-body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
-.header{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid var(--border);background:var(--bg2)}
-.logo{display:flex;align-items:center;gap:12px}
-.logo-mark{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#000;letter-spacing:1px}
-.logo-text{font-size:18px;font-weight:600;letter-spacing:2px}
-.logo-sub{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-top:1px}
-.header-right{display:flex;align-items:center;gap:20px}
-.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:1px}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-.last-updated{font-family:var(--mono);font-size:11px;color:var(--text3)}
-.account-tabs{display:flex;gap:8px;padding:14px 32px;border-bottom:1px solid var(--border);background:var(--bg2);overflow-x:auto}
-.tab{padding:7px 18px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);color:var(--text2);transition:all 0.15s;white-space:nowrap;font-family:var(--mono);letter-spacing:0.5px}
-.tab:hover{background:var(--bg3);color:var(--text)}
-.tab.active{background:var(--gold);border-color:var(--gold);color:#000;font-weight:600}
-.tab.live-tab{border-color:#00c89633}
-.tab.demo-tab{border-color:#9966ff33}
-.main{padding:24px 32px;display:flex;flex-direction:column;gap:20px}
-.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
-.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--gold))}
-.kpi-label{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
-.kpi-value{font-size:24px;font-weight:600;color:var(--text);line-height:1}
-.kpi-sub{font-size:10px;color:var(--text2);margin-top:5px;font-family:var(--mono)}
-.kpi.green{--accent:var(--green)}
-.kpi.red{--accent:var(--red)}
-.kpi.blue{--accent:var(--blue)}
-.kpi.purple{--accent:var(--purple)}
-.two-col{display:grid;grid-template-columns:1.4fr 1fr;gap:20px}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.card-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.card-title{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:2px;text-transform:uppercase}
-.card-body{padding:20px}
-.chart-wrap{position:relative;height:240px}
-.daily-chart-wrap{position:relative;height:240px}
-.acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.acct-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px}
-.acct-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.acct-label{font-size:12px;font-weight:600}
-.acct-type{font-size:10px;font-family:var(--mono);padding:3px 8px;border-radius:4px;letter-spacing:1px}
-.acct-type.live{background:#00c89620;color:var(--green)}
-.acct-type.demo{background:#9966ff20;color:var(--purple)}
-.acct-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.acct-stat-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
-.trades-table{width:100%;border-collapse:collapse;font-size:12px}
-.trades-table th{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1.5px;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border)}
-.trades-table td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text2)}
-.trades-table tr:last-child td{border-bottom:none}
-.trades-table tr:hover td{background:var(--bg3)}
-.dir-buy{color:var(--green);font-weight:600;font-family:var(--mono)}
-.dir-sell{color:var(--red);font-weight:600;font-family:var(--mono)}
-.pnl-pos{color:var(--green);font-weight:600}
-.pnl-neg{color:var(--red);font-weight:600}
-.daily-table{width:100%;border-collapse:collapse;font-size:12px}
-.daily-table th{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1.5px;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border)}
-.daily-table td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text2)}
-.daily-table tr:last-child td{border-bottom:none}
-.daily-table tr:hover td{background:var(--bg3)}
-.spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:auto}
-@keyframes spin{to{transform:rotate(360deg)}}
-.loading{display:flex;align-items:center;justify-content:center;height:120px;gap:12px;flex-direction:column}
-.loading-text{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1px}
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:800px){.kpi-row{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}.header{padding:14px 16px}.main{padding:16px}.account-tabs{padding:10px 16px}}
-</style>
-</head>
-<body>
+"""
+download_analyser.py
+Downloads the fixed csea_analyser.html (v1.1) from Supabase
+Save this in your csea-analyser repo folder and run it,
+then git add index.html, git commit, git push.
 
-<div class="header">
-  <div class="logo">
-    <div class="logo-mark">CS</div>
-    <div>
-      <div class="logo-text">CSEA</div>
-      <div class="logo-sub">TRADING ANALYTICS</div>
-    </div>
-  </div>
-  <div class="header-right">
-    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
-    <div class="last-updated" id="last-updated">--:--:--</div>
-  </div>
-</div>
+Usage: python download_analyser.py
+"""
 
-<div class="account-tabs" id="account-tabs">
-  <div class="tab active" data-id="all">ALL ACCOUNTS</div>
-</div>
+import urllib.request
+import json
 
-<div class="main">
-  <div class="kpi-row" id="kpi-row">
-    <div class="kpi" style="grid-column:1/-1"><div class="loading"><div class="spinner"></div><div class="loading-text">LOADING DATA...</div></div></div>
-  </div>
+SB_URL = "https://nmyveijljquxvhjelqbc.supabase.co"
+SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5teXZlaWpsanF1eHZoamVscWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjc2MjgsImV4cCI6MjA4Nzk0MzYyOH0.YT-sAh2Spn1805dnylTsZ2gBx-T7yC6fyOKIs0YPlP4"
 
-  <div class="two-col">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">EQUITY CURVE</span>
-        <span id="equity-label" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></span>
-      </div>
-      <div class="card-body"><div class="chart-wrap"><canvas id="equityChart"></canvas></div></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">DAILY P&L — LAST 30 DAYS</span></div>
-      <div class="card-body"><div class="daily-chart-wrap"><canvas id="dailyChart"></canvas></div></div>
-    </div>
-  </div>
+FILENAME = "csea_analyser.html"
+OUTPUT   = "index.html"
 
-  <div class="card">
-    <div class="card-header"><span class="card-title">ACCOUNTS</span></div>
-    <div class="card-body"><div class="acct-grid" id="acct-grid"><div class="loading"><div class="spinner"></div></div></div></div>
-  </div>
+print(f"Downloading {FILENAME} from Supabase...")
 
-  <div class="two-col">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">RECENT CLOSED TRADES</span>
-        <span id="trades-count" style="font-family:var(--mono);font-size:10px;color:var(--text3)"></span>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="trades-table">
-          <thead><tr><th>TIME</th><th>SYMBOL</th><th>DIR</th><th>P&L</th><th>BALANCE</th></tr></thead>
-          <tbody id="trades-body"><tr><td colspan="5" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">DAILY LOG</span></div>
-      <div style="overflow-x:auto">
-        <table class="daily-table">
-          <thead><tr><th>DATE</th><th>P&L</th><th>BALANCE</th><th>TRADES</th><th>TARGET</th></tr></thead>
-          <tbody id="daily-body"><tr><td colspan="5" style="padding:40px;text-align:center"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
+url = SB_URL + "/rest/v1/gtmo_files?filename=eq." + FILENAME + "&select=content"
+req = urllib.request.Request(url, headers={
+    "apikey": SB_KEY,
+    "Authorization": "Bearer " + SB_KEY,
+    "Accept": "application/json"
+})
 
-<script>
-const SB_URL='https://nmyveijljquxvhjelqbc.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5teXZlaWpsanF1eHZoamVscWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjc2MjgsImV4cCI6MjA4Nzk0MzYyOH0.YT-sAh2Spn1805dnylTsZ2gBx-T7yC6fyOKIs0YPlP4';
-
-const pnlCol=n=>parseFloat(n)>=0?'var(--green)':'var(--red)';
-const pnlCls=n=>parseFloat(n)>=0?'pnl-pos':'pnl-neg';
-const pnlSgn=n=>parseFloat(n)>=0?'+':'';
-const fmtGBP=(n,d=2)=>parseFloat(n||0).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
-
-async function sb(table,params=''){
-  const r=await fetch(`${SB_URL}/rest/v1/${table}?${params}`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
-  if(!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
-}
-
-let accounts=[],trades=[],daily=[],sel='all';
-let eChart=null,dChart=null;
-
-async function init(){
-  accounts=await sb('accounts','select=id,label,account_type,broker,currency&order=account_type.asc,label.asc');
-  trades=await sb('trades','select=id,account_id,ts,symbol,direction,pnl,balance,event&event=eq.CLOSE&order=ts.desc&limit=1000');
-  daily=await sb('daily','select=*&order=date.desc&limit=90');
-
-  buildTabs();
-  render();
-
-  setInterval(()=>{document.getElementById('last-updated').textContent=new Date().toLocaleTimeString('en-GB');},1000);
-  document.getElementById('last-updated').textContent=new Date().toLocaleTimeString('en-GB');
-  setTimeout(()=>location.reload(),60000);
-}
-
-function buildTabs(){
-  const el=document.getElementById('account-tabs');
-  el.innerHTML='<div class="tab active" data-id="all">ALL ACCOUNTS</div>';
-  accounts.forEach(a=>{
-    const t=document.createElement('div');
-    t.className=`tab ${a.account_type}-tab`;
-    t.dataset.id=a.id;
-    t.textContent=a.label.split('·')[0].trim().toUpperCase();
-    el.appendChild(t);
-  });
-  el.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
-    el.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    sel=t.dataset.id;
-    render();
-  }));
-}
-
-function filtered(arr,field='account_id'){return sel==='all'?arr:arr.filter(d=>d[field]===sel);}
-
-function render(){
-  const t=filtered(trades);
-  const d=filtered(daily,'account_id');
-  renderKPIs(t,d);
-  renderAccounts();
-  renderEquity(t);
-  renderDaily(d);
-  renderTradesTable(t);
-  renderDailyTable(d);
-}
-
-function renderKPIs(t,d){
-  const totalPnl=t.reduce((s,x)=>s+parseFloat(x.pnl||0),0);
-  const wins=t.filter(x=>parseFloat(x.pnl)>0).length;
-  const wr=t.length?(wins/t.length*100).toFixed(1):'0.0';
-  const bal=t.length?parseFloat(t[0].balance||0):0;
-  const today=new Date().toISOString().slice(0,10);
-  const todayPnl=d.filter(x=>x.date===today).reduce((s,x)=>s+parseFloat(x.daily_pnl||0),0);
-  const peak=t.reduce((m,x)=>Math.max(m,parseFloat(x.balance||0)),0);
-  const dd=peak>0?((peak-bal)/peak*100).toFixed(1):'0.0';
-
-  document.getElementById('kpi-row').innerHTML=`
-    <div class="kpi blue"><div class="kpi-label">BALANCE</div><div class="kpi-value">£${fmtGBP(bal,0)}</div><div class="kpi-sub">Peak £${fmtGBP(peak,0)}</div></div>
-    <div class="kpi ${totalPnl>=0?'green':'red'}"><div class="kpi-label">TOTAL P&L</div><div class="kpi-value" style="color:${pnlCol(totalPnl)}">${pnlSgn(totalPnl)}£${fmtGBP(Math.abs(totalPnl))}</div><div class="kpi-sub">${t.length} closed trades</div></div>
-    <div class="kpi ${parseFloat(wr)>=50?'green':'red'}"><div class="kpi-label">WIN RATE</div><div class="kpi-value" style="color:${parseFloat(wr)>=50?'var(--green)':'var(--red)'}">${wr}%</div><div class="kpi-sub">${wins}W / ${t.length-wins}L</div></div>
-    <div class="kpi ${todayPnl>=0?'green':'red'}"><div class="kpi-label">TODAY P&L</div><div class="kpi-value" style="color:${pnlCol(todayPnl)}">${pnlSgn(todayPnl)}£${Math.abs(todayPnl).toFixed(2)}</div><div class="kpi-sub">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div>
-    <div class="kpi ${parseFloat(dd)<10?'green':parseFloat(dd)<20?'':'red'}"><div class="kpi-label">DRAWDOWN</div><div class="kpi-value" style="color:${parseFloat(dd)<10?'var(--green)':parseFloat(dd)<20?'var(--gold)':'var(--red)'}">${dd}%</div><div class="kpi-sub">from peak £${fmtGBP(peak,0)}</div></div>
-    <div class="kpi purple"><div class="kpi-label">ACCOUNTS</div><div class="kpi-value" style="color:var(--purple)">${sel==='all'?accounts.length:1}</div><div class="kpi-sub">${accounts.filter(a=>a.account_type==='live').length} live · ${accounts.filter(a=>a.account_type==='demo').length} demo</div></div>`;
-}
-
-function renderAccounts(){
-  const list=sel==='all'?accounts:accounts.filter(a=>a.id===sel);
-  document.getElementById('acct-grid').innerHTML=list.map(a=>{
-    const at=trades.filter(t=>t.account_id===a.id);
-    const pnl=at.reduce((s,t)=>s+parseFloat(t.pnl||0),0);
-    const w=at.filter(t=>parseFloat(t.pnl)>0).length;
-    const wr=at.length?(w/at.length*100).toFixed(0):0;
-    const bal=at.length?parseFloat(at[0].balance||0):0;
-    return `<div class="acct-card">
-      <div class="acct-card-top"><div class="acct-label">${a.label}</div><div class="acct-type ${a.account_type}">${a.account_type.toUpperCase()}</div></div>
-      <div class="acct-stats">
-        <div><div class="acct-stat-label">BALANCE</div><div style="font-size:15px;font-weight:600">£${fmtGBP(bal,0)}</div></div>
-        <div><div class="acct-stat-label">TOTAL P&L</div><div style="font-size:15px;font-weight:600;color:${pnlCol(pnl)}">${pnlSgn(pnl)}£${Math.abs(pnl).toFixed(0)}</div></div>
-        <div><div class="acct-stat-label">WIN RATE</div><div style="font-size:15px;font-weight:600;color:${parseFloat(wr)>=50?'var(--green)':'var(--red)'}">${wr}%</div></div>
-      </div>
-      <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--text3)">${a.broker} · ${a.currency} · ${at.length} trades</div>
-    </div>`;
-  }).join('');
-}
-
-function renderEquity(t){
-  const pts=t.slice().reverse().filter(x=>x.balance);
-  const labels=pts.map(x=>new Date(x.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
-  const data=pts.map(x=>parseFloat(x.balance));
-  const change=(data[data.length-1]||0)-(data[0]||0);
-  const el=document.getElementById('equity-label');
-  el.textContent=`${pnlSgn(change)}£${Math.abs(change).toFixed(2)} overall`;
-  el.style.color=change>=0?'var(--green)':'var(--red)';
-  if(eChart)eChart.destroy();
-  const ctx=document.getElementById('equityChart').getContext('2d');
-  const g=ctx.createLinearGradient(0,0,0,240);
-  const up=change>=0;
-  g.addColorStop(0,up?'rgba(0,200,150,0.25)':'rgba(240,64,96,0.25)');
-  g.addColorStop(1,'rgba(0,0,0,0)');
-  eChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:up?'#00c896':'#f04060',borderWidth:2,pointRadius:0,fill:true,backgroundColor:g,tension:0.3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2129',borderColor:'#ffffff18',borderWidth:1,titleColor:'#8892a4',bodyColor:'#e8eaf0',padding:10,callbacks:{label:c=>`  £${parseFloat(c.raw).toLocaleString('en-GB',{minimumFractionDigits:2})}`}}},
-    scales:{x:{grid:{color:'#ffffff08'},ticks:{color:'#5a6478',font:{family:'JetBrains Mono',size:10},maxTicksLimit:8}},y:{grid:{color:'#ffffff08'},ticks:{color:'#5a6478',font:{family:'JetBrains Mono',size:10},callback:v=>'£'+v.toLocaleString('en-GB')}}}}});
-}
-
-function renderDaily(d){
-  const pts=d.slice(0,30).reverse();
-  const labels=pts.map(x=>new Date(x.date+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
-  const data=pts.map(x=>parseFloat(x.daily_pnl||0));
-  if(dChart)dChart.destroy();
-  const ctx=document.getElementById('dailyChart').getContext('2d');
-  dChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:data.map(v=>v>=0?'#00c896aa':'#f04060aa'),borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2129',borderColor:'#ffffff18',borderWidth:1,titleColor:'#8892a4',bodyColor:'#e8eaf0',padding:10,callbacks:{label:c=>`  ${parseFloat(c.raw)>=0?'+':''}£${parseFloat(c.raw).toFixed(2)}`}}},
-    scales:{x:{grid:{display:false},ticks:{color:'#5a6478',font:{family:'JetBrains Mono',size:9},maxTicksLimit:10}},y:{grid:{color:'#ffffff08'},ticks:{color:'#5a6478',font:{family:'JetBrains Mono',size:10},callback:v=>(v>=0?'+':'')+'£'+v}}}}});
-}
-
-function renderTradesTable(t){
-  document.getElementById('trades-count').textContent=`SHOWING ${Math.min(t.length,20)}`;
-  document.getElementById('trades-body').innerHTML=t.slice(0,20).map(x=>`
-    <tr>
-      <td style="font-family:var(--mono);font-size:11px">${new Date(x.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
-      <td style="font-weight:600;color:var(--text)">${x.symbol}</td>
-      <td class="${x.direction==='BUY'?'dir-buy':'dir-sell'}">${x.direction}</td>
-      <td class="${pnlCls(x.pnl)}">${pnlSgn(x.pnl)}£${Math.abs(parseFloat(x.pnl)).toFixed(2)}</td>
-      <td style="font-family:var(--mono);font-size:11px">£${fmtGBP(x.balance)}</td>
-    </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text3)">No trades found</td></tr>';
-}
-
-function renderDailyTable(d){
-  document.getElementById('daily-body').innerHTML=d.slice(0,20).map(x=>`
-    <tr>
-      <td style="font-family:var(--mono);font-size:11px">${new Date(x.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</td>
-      <td class="${pnlCls(x.daily_pnl)}">${pnlSgn(x.daily_pnl)}£${Math.abs(parseFloat(x.daily_pnl||0)).toFixed(2)}</td>
-      <td style="font-family:var(--mono);font-size:11px">£${fmtGBP(x.start_balance)}</td>
-      <td style="font-family:var(--mono);text-align:center">${x.trades_closed||0}</td>
-      <td style="color:${x.target_hit?'var(--green)':'var(--text3)'}">${x.target_hit?'✓':'—'}</td>
-    </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text3)">No data</td></tr>';
-}
-
-init().catch(e=>{
-  document.getElementById('kpi-row').innerHTML=`<div style="grid-column:1/-1;padding:20px;font-family:var(--mono);font-size:12px;color:var(--red);background:#f0406010;border-radius:8px;border:1px solid #f0406030">Error: ${e.message}</div>`;
-});
-</script>
-</body>
-</html>
+try:
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        if not data:
+            print("ERROR: No file found in Supabase.")
+        else:
+            content = data[0]["content"]
+            with open(OUTPUT, "w", encoding="utf-8") as f:
+                f.write(content)
+            size_kb = len(content) / 1024
+            print(f"SUCCESS: Saved as {OUTPUT}  ({size_kb:.1f} KB)")
+            print(f"Version check: {'v1.1' in content}")
+            print()
+            print("Now run:")
+            print("  git add index.html")
+            print("  git commit -m 'Fix analyser v1.1'")
+            print("  git push")
+except Exception as e:
+    print(f"ERROR: {e}")
+    print("Check your internet connection and try again.")
