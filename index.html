@@ -117,7 +117,6 @@ async function sb(table, query) {
 async function init() {
   setStatus('<span class="spinner"></span>Loading accounts...');
   try {
-    // Load only CSEA strategy accounts
     var all = await sb('accounts','select=id,label,account_type,strategy,account_number,broker&strategy=eq.CSEA');
     accounts = all;
     var sel = document.getElementById('acctSel');
@@ -141,7 +140,6 @@ async function loadAll() {
     var acctFilter = acctId === 'ALL' ? '' : 'account_id=eq.'+acctId+'&';
     var dateFilter = cleanStart ? 'ts=gte.'+cleanStart+'T00:00:00&' : '';
     var dailyDateFilter = cleanStart ? 'date=gte.'+cleanStart+'&' : '';
-
     var results = await Promise.all([
       sb('trades', acctFilter+dateFilter+'select=*&order=ts'),
       sb('signals', acctFilter+dateFilter+'select=*&order=ts'),
@@ -150,7 +148,6 @@ async function loadAll() {
     db.trades = results[0] || [];
     db.signals = results[1] || [];
     db.daily = results[2] || [];
-
     var cleanNote = cleanStart ? ' (from '+cleanStart+')' : '';
     setStatus('&#10003; Loaded &mdash; '+db.trades.length+' trades, '+db.signals.length+' signals, '+db.daily.length+' daily rows'+cleanNote);
     runAnalysis();
@@ -161,24 +158,17 @@ async function loadAll() {
 }
 
 function setStatus(html) { document.getElementById('status').innerHTML = html; }
-
 function switchTab(id, el) {
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
   el.classList.add('active');
   document.getElementById('tab-'+id).classList.add('active');
 }
-
 function runAnalysis() {
   document.getElementById('results').classList.remove('hidden');
-  renderOverview();
-  renderSignalIntegrity();
-  renderExecution();
-  renderManagement();
-  renderCompound();
-  renderAnomalies();
+  renderOverview(); renderSignalIntegrity(); renderExecution();
+  renderManagement(); renderCompound(); renderAnomalies();
 }
-
 function closed() {
   return db.trades.filter(function(t){
     return (t.event==='CLOSE'||t.event==='COMPOUND_CLOSE') && parseFloat(t.pnl||0) !== 0;
@@ -188,7 +178,6 @@ function opened() { return db.trades.filter(function(t){return t.event==='OPEN';
 function pnl(t) { return parseFloat(t.pnl||0); }
 function fmtPnl(v) { return (v>=0?'+':'')+v.toFixed(2); }
 
-// ── OVERVIEW ──────────────────────────────────────────────────────
 function renderOverview() {
   var cl = closed();
   var wins = cl.filter(function(t){return pnl(t)>0;});
@@ -198,396 +187,223 @@ function renderOverview() {
   var grossW = wins.reduce(function(s,t){return s+pnl(t);},0);
   var grossL = Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));
   var pf = grossL>0 ? grossW/grossL : 999;
-  var sigs = db.signals.length;
-  var opened_sigs = db.signals.filter(function(s){return s.result==='OPENED';}).length;
-  var blocked_sigs = db.signals.filter(function(s){return s.result==='BLOCKED';}).length;
-
   var checks = getHealthChecks();
   var passCount = checks.filter(function(c){return c.status==='ok';}).length;
   var warnCount = checks.filter(function(c){return c.status==='warn';}).length;
   var failCount = checks.filter(function(c){return c.status==='fail';}).length;
   var overallStatus = failCount>0?'ISSUES FOUND':warnCount>0?'WARNINGS':'ALL CLEAR';
   var overallClass = failCount>0?'fail':warnCount>0?'warn':'ok';
-
   var cleanStart = document.getElementById('cleanStartFilter').value;
-
   document.getElementById('tab-overview').innerHTML =
-  '<div class="clean-start-banner">&#128197; <strong>Analysis period:</strong> '+(cleanStart?'From '+cleanStart+' (clean start)':'All available data')+'  &nbsp;&middot;&nbsp;  <strong>EA v3.67</strong> &nbsp;&middot;&nbsp; Compound Table mode &nbsp;&middot;&nbsp; GlobalPrime Demo #107499</div>'+
+  '<div class="clean-start-banner">&#128197; <strong>Period:</strong> '+(cleanStart?'From '+cleanStart+' (clean start)':'All data')+' &nbsp;&middot;&nbsp; <strong>EA v3.67</strong> &nbsp;&middot;&nbsp; Compound Table &nbsp;&middot;&nbsp; GlobalPrime Demo #107499</div>'+
   '<div class="kpi-grid">'+
-    '<div class="kpi"><div class="kpi-label">System Health</div>'+
-      '<div class="kpi-value '+(overallClass==='ok'?'green':overallClass==='warn'?'gold':'red')+'">'+overallStatus+'</div>'+
-      '<div class="kpi-sub">'+passCount+' pass &middot; '+warnCount+' warn &middot; '+failCount+' fail</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Total P&L</div>'+
-      '<div class="kpi-value '+(totalPnl>=0?'green':'red')+'">'+fmtPnl(totalPnl)+'</div>'+
-      '<div class="kpi-sub">'+cl.length+' closed trades</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Win Rate</div>'+
-      '<div class="kpi-value '+(wr>=50?'green':'red')+'">'+wr.toFixed(1)+'%</div>'+
-      '<div class="kpi-sub">'+wins.length+'W / '+losses.length+'L</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Profit Factor</div>'+
-      '<div class="kpi-value '+(pf>=1.2?'green':pf>=1?'gold':'red')+'">'+(pf===999?'&infin;':pf.toFixed(2))+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Signals</div>'+
-      '<div class="kpi-value cyan">'+sigs+'</div>'+
-      '<div class="kpi-sub">'+opened_sigs+' opened &middot; '+blocked_sigs+' blocked</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Daily Rows</div>'+
-      '<div class="kpi-value blue">'+db.daily.length+'</div>'+
-      '<div class="kpi-sub">trading days</div></div>'+
+    '<div class="kpi"><div class="kpi-label">System Health</div><div class="kpi-value '+(overallClass==='ok'?'green':overallClass==='warn'?'gold':'red')+'">'+overallStatus+'</div><div class="kpi-sub">'+passCount+' pass &middot; '+warnCount+' warn &middot; '+failCount+' fail</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Total P&L</div><div class="kpi-value '+(totalPnl>=0?'green':'red')+'">'+fmtPnl(totalPnl)+'</div><div class="kpi-sub">'+cl.length+' closed</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-value '+(wr>=50?'green':'red')+'">'+wr.toFixed(1)+'%</div><div class="kpi-sub">'+wins.length+'W / '+losses.length+'L</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-value '+(pf>=1.2?'green':pf>=1?'gold':'red')+'">'+(pf===999?'&infin;':pf.toFixed(2))+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Signals</div><div class="kpi-value cyan">'+db.signals.length+'</div><div class="kpi-sub">'+db.signals.filter(function(s){return s.result==='OPENED';}).length+' opened</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Daily Rows</div><div class="kpi-value blue">'+db.daily.length+'</div></div>'+
   '</div>'+
-  '<div class="card">'+
-    '<div class="card-title">System Health Checks <span class="badge '+overallClass+'">'+passCount+'/'+checks.length+' PASS</span></div>'+
-    '<div class="check-grid">'+
-      checks.map(function(c){
-        return '<div class="check-row"><div class="check-icon">'+(c.status==='ok'?'&#10003;':c.status==='warn'?'&#9888;':'&#10007;')+'</div>'+
-          '<div><div class="check-label">'+c.label+'</div><div class="check-detail">'+c.detail+'</div></div></div>';
-      }).join('')+
-    '</div>'+
-  '</div>';
+  '<div class="card"><div class="card-title">Health Checks <span class="badge '+overallClass+'">'+passCount+'/'+checks.length+' PASS</span></div>'+
+  '<div class="check-grid">'+checks.map(function(c){
+    return '<div class="check-row"><div class="check-icon">'+(c.status==='ok'?'&#10003;':c.status==='warn'?'&#9888;':'&#10007;')+'</div>'+
+      '<div><div class="check-label">'+c.label+'</div><div class="check-detail">'+c.detail+'</div></div></div>';
+  }).join('')+'</div></div>';
 }
 
 function getHealthChecks() {
-  var cl = closed();
-  var checks = [];
-
-  checks.push({
-    label: 'Supabase Data Connectivity',
-    status: db.trades.length>0?'ok':'fail',
-    detail: db.trades.length>0
-      ? db.trades.length+' trade rows, '+db.signals.length+' signal rows, '+db.daily.length+' daily rows loaded'
-      : 'No trade data &mdash; EA may not be pushing. Check InpUserID and InpPlatformAPIKey in EA properties.'
-  });
-
-  var openedSigs = db.signals.filter(function(s){return s.result==='OPENED'&&s.gap!=null;});
-  var lowGapSigs = openedSigs.filter(function(s){return parseFloat(s.gap)<0.5;});
-  checks.push({
-    label: 'Signal Gap Threshold (&ge;0.5 InpMinStrengthGap)',
-    status: lowGapSigs.length===0?'ok':lowGapSigs.length<3?'warn':'fail',
-    detail: lowGapSigs.length===0
-      ? 'All '+openedSigs.length+' opened signals meet minimum gap threshold'
-      : lowGapSigs.length+' signals opened with gap < 0.5: '+lowGapSigs.map(function(s){return s.symbol+' gap='+parseFloat(s.gap).toFixed(3);}).join(', ')
-  });
-
-  var zoneDepthOK = db.signals.filter(function(s){return s.result==='OPENED'&&s.gap!=null&&parseFloat(s.gap)>=0.5;}).length;
-  var orphanedOPENs = db.trades.filter(function(t){
-    if(t.event!=='OPEN') return false;
+  var cl = closed(); var checks = [];
+  checks.push({label:'Supabase Connectivity',status:db.trades.length>0?'ok':'fail',
+    detail:db.trades.length>0?db.trades.length+' trades, '+db.signals.length+' signals, '+db.daily.length+' daily rows':'No data &mdash; check InpUserID and InpPlatformAPIKey in EA'});
+  var openedSigs=db.signals.filter(function(s){return s.result==='OPENED'&&s.gap!=null;});
+  var lowGap=openedSigs.filter(function(s){return parseFloat(s.gap)<0.5;});
+  checks.push({label:'Gap Threshold (&ge;0.5)',status:lowGap.length===0?'ok':lowGap.length<3?'warn':'fail',
+    detail:lowGap.length===0?'All '+openedSigs.length+' signals meet threshold':lowGap.length+' signals below 0.5 gap: '+lowGap.map(function(s){return s.symbol+' '+parseFloat(s.gap).toFixed(3);}).join(', ')});
+  var orphaned=db.trades.filter(function(t){
+    if(t.event!=='OPEN')return false;
     return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});
   }).length;
-  checks.push({
-    label: 'Orphaned OPEN Records',
-    status: orphanedOPENs===0?'ok':orphanedOPENs<3?'warn':'fail',
-    detail: orphanedOPENs===0
-      ? 'No orphaned OPEN records &mdash; all opens have a matching close'
-      : orphanedOPENs+' OPEN records with no matching CLOSE (current open positions). If unexpectedly high, clean stale pre-clean-start records.'
-  });
-
-  var openedSigCount = db.signals.filter(function(s){return s.result==='OPENED';}).length;
-  var closedCount = cl.length;
-  var openedTradesCount = opened().length;
-  var match = Math.abs(openedSigCount - (closedCount + openedTradesCount)) <= 3;
-  checks.push({
-    label: 'Signal &rarr; Trade Matching',
-    status: openedSigCount===0?'warn':match?'ok':'warn',
-    detail: openedSigCount+' opened signals vs '+closedCount+' closed + '+openedTradesCount+' open = '+(closedCount+openedTradesCount)+' total trades'
-  });
-
-  var bigLosses = cl.filter(function(t){return pnl(t)<-50;});
-  checks.push({
-    label: 'No Runaway Losses (&gt;$50 single trade)',
-    status: bigLosses.length===0?'ok':bigLosses.length<3?'warn':'fail',
-    detail: bigLosses.length===0
-      ? 'All losses within expected range'
-      : bigLosses.length+' trades lost >$50: '+bigLosses.map(function(t){return t.symbol+' '+fmtPnl(pnl(t));}).join(', ')
-  });
-
-  var compoundTrades = cl.filter(function(t){return t.compound_day&&parseInt(t.compound_day)>0;});
-  checks.push({
-    label: 'Compound Mode Data',
-    status: compoundTrades.length>0?'ok':'warn',
-    detail: compoundTrades.length>0
-      ? compoundTrades.length+'/'+cl.length+' trades have compound_day populated'
-      : 'No compound_day found on closed trades &mdash; push may have been offline'
-  });
-
-  var lastDaily = db.daily.slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');})[0];
-  checks.push({
-    label: 'Daily Table Currency',
-    status: lastDaily?'ok':'warn',
-    detail: lastDaily
-      ? 'Latest daily row: '+lastDaily.date+' | Day '+lastDaily.compound_day+' | Lot '+parseFloat(lastDaily.compound_lot||0).toFixed(2)+' | Target $'+parseFloat(lastDaily.compound_target||0).toFixed(2)
-      : 'No daily rows found'
-  });
-
+  checks.push({label:'Orphaned OPEN Records',status:orphaned===0?'ok':orphaned<3?'warn':'fail',
+    detail:orphaned===0?'All opens have matching closes':orphaned+' OPENs with no matching CLOSE (may be current positions)'});
+  var cmpd=cl.filter(function(t){return t.compound_day&&parseInt(t.compound_day)>0;});
+  checks.push({label:'Compound Mode Data',status:cmpd.length>0?'ok':'warn',
+    detail:cmpd.length>0?cmpd.length+'/'+cl.length+' trades have compound_day set':'No compound_day on closed trades'});
+  var lastD=db.daily.slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');})[0];
+  checks.push({label:'Daily Table',status:lastD?'ok':'warn',
+    detail:lastD?'Latest: '+lastD.date+' | Day '+lastD.compound_day+' | Lot '+parseFloat(lastD.compound_lot||0).toFixed(2)+' | Target $'+parseFloat(lastD.compound_target||0).toFixed(2):'No daily rows'});
   return checks;
 }
 
-// ── SIGNAL INTEGRITY ──────────────────────────────────────────────
 function renderSignalIntegrity() {
-  var sigs = db.signals;
-  if(!sigs.length) {
-    document.getElementById('tab-signals').innerHTML='<div class="card"><p style="color:var(--sub)">No signal data loaded.</p></div>';
-    return;
-  }
-  var openedSigs = sigs.filter(function(s){return s.result==='OPENED';});
-  var blocked = sigs.filter(function(s){return s.result==='BLOCKED';});
-  var reasons = {};
-  blocked.forEach(function(s){var r=s.block_reason||'Unknown';reasons[r]=(reasons[r]||0)+1;});
-  var gaps = openedSigs.map(function(s){return parseFloat(s.gap||0);}).filter(function(v){return !isNaN(v);});
-  var avgGap = gaps.length ? gaps.reduce(function(a,b){return a+b;},0)/gaps.length : 0;
-  var symCount = {};
-  openedSigs.forEach(function(s){symCount[s.symbol||'?']=(symCount[s.symbol||'?']||0)+1;});
-  var topSyms = Object.entries(symCount).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
-
-  document.getElementById('tab-signals').innerHTML =
+  var sigs=db.signals;
+  if(!sigs.length){document.getElementById('tab-signals').innerHTML='<div class="card"><p style="color:var(--sub)">No signal data.</p></div>';return;}
+  var opened_s=sigs.filter(function(s){return s.result==='OPENED';});
+  var blocked=sigs.filter(function(s){return s.result==='BLOCKED';});
+  var reasons={};blocked.forEach(function(s){var r=s.block_reason||'Unknown';reasons[r]=(reasons[r]||0)+1;});
+  var gaps=opened_s.map(function(s){return parseFloat(s.gap||0);}).filter(function(v){return !isNaN(v);});
+  var avgGap=gaps.length?gaps.reduce(function(a,b){return a+b;},0)/gaps.length:0;
+  var symCount={};opened_s.forEach(function(s){symCount[s.symbol||'?']=(symCount[s.symbol||'?']||0)+1;});
+  var topSyms=Object.entries(symCount).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  document.getElementById('tab-signals').innerHTML=
   '<div class="kpi-grid">'+
-    '<div class="kpi"><div class="kpi-label">Total Signals</div><div class="kpi-value cyan">'+sigs.length+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Opened</div><div class="kpi-value green">'+openedSigs.length+'</div>'+
-      '<div class="kpi-sub">'+(sigs.length?(openedSigs.length/sigs.length*100).toFixed(1):0)+'% open rate</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Total</div><div class="kpi-value cyan">'+sigs.length+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Opened</div><div class="kpi-value green">'+opened_s.length+'</div><div class="kpi-sub">'+(sigs.length?(opened_s.length/sigs.length*100).toFixed(1):0)+'%</div></div>'+
     '<div class="kpi"><div class="kpi-label">Blocked</div><div class="kpi-value red">'+blocked.length+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Avg Gap</div><div class="kpi-value gold">'+avgGap.toFixed(3)+'</div></div>'+
   '</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'+
-    '<div class="card"><div class="card-title">Block Reasons</div>'+
-      Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).map(function(r){
-        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">'+
-          '<span style="color:var(--sub)">'+r[0]+'</span>'+
-          '<span style="font-weight:700;color:var(--gold)">'+r[1]+'</span></div>';
-      }).join('')+
-    '</div>'+
-    '<div class="card"><div class="card-title">Top Traded Symbols</div>'+
-      topSyms.map(function(s){
-        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">'+
-          '<span style="color:var(--cyan);font-weight:600">'+s[0]+'</span>'+
-          '<span style="font-weight:700">'+s[1]+' signals</span></div>';
-      }).join('')+
-    '</div>'+
+    '<div class="card"><div class="card-title">Block Reasons</div>'+Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).map(function(r){
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--sub)">'+r[0]+'</span><span style="font-weight:700;color:var(--gold)">'+r[1]+'</span></div>';
+    }).join('')+'</div>'+
+    '<div class="card"><div class="card-title">Top Symbols</div>'+topSyms.map(function(s){
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--cyan);font-weight:600">'+s[0]+'</span><span style="font-weight:700">'+s[1]+'</span></div>';
+    }).join('')+'</div>'+
   '</div>'+
-  '<div class="card"><div class="card-title">Recent Signals (last 50)</div>'+
-  '<div class="tbl-wrap"><table>'+
+  '<div class="card"><div class="card-title">Recent Signals (last 50)</div><div class="tbl-wrap"><table>'+
     '<thead><tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Strong</th><th>Weak</th><th>Gap</th><th>Result</th><th>Reason</th></tr></thead>'+
     '<tbody>'+sigs.slice(-50).reverse().map(function(s){
-      return '<tr>'+
-        '<td style="color:var(--sub)">'+(s.ts||'').slice(0,16)+'</td>'+
-        '<td style="color:var(--cyan);font-weight:600">'+(s.symbol||'&mdash;')+'</td>'+
-        '<td><span class="badge-'+((s.direction||'').toLowerCase())+'">'+(s.direction||'&mdash;')+'</span></td>'+
-        '<td style="color:var(--green)">'+(s.strong_cur||'&mdash;')+'</td>'+
-        '<td style="color:var(--red)">'+(s.weak_cur||'&mdash;')+'</td>'+
-        '<td>'+parseFloat(s.gap||0).toFixed(3)+'</td>'+
-        '<td><span class="'+(s.result==='OPENED'?'badge-ok':'badge-fail')+'">'+(s.result||'&mdash;')+'</span></td>'+
-        '<td style="color:var(--sub);font-size:10px">'+(s.block_reason||'')+'</td>'+
-      '</tr>';
-    }).join('')+
-    '</tbody></table></div></div>';
+      return '<tr><td style="color:var(--sub)">'+(s.ts||'').slice(0,16)+'</td><td style="color:var(--cyan);font-weight:600">'+(s.symbol||'')+'</td>'+
+        '<td><span class="badge-'+((s.direction||'').toLowerCase())+'">'+(s.direction||'')+'</span></td>'+
+        '<td style="color:var(--green)">'+(s.strong_cur||'')+'</td><td style="color:var(--red)">'+(s.weak_cur||'')+'</td>'+
+        '<td>'+parseFloat(s.gap||0).toFixed(3)+'</td><td><span class="'+(s.result==='OPENED'?'badge-ok':'badge-fail')+'">'+(s.result||'')+'</span></td>'+
+        '<td style="color:var(--sub);font-size:10px">'+(s.block_reason||'')+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
 }
 
-// ── EXECUTION ──────────────────────────────────────────────────────
 function renderExecution() {
-  var cl = closed();
-  var openedSigs = db.signals.filter(function(s){return s.result==='OPENED';});
-  var sigSymTimes = openedSigs.map(function(s){return {sym:s.symbol,ts:(s.ts||'').slice(0,13),dir:s.direction};});
-  var unmatched = sigSymTimes.filter(function(sig){
-    return !db.trades.some(function(t){
-      return t.symbol===sig.sym && (t.direction||'').toUpperCase()===(sig.dir||'').toUpperCase() && (t.ts||'').slice(0,13)===sig.ts;
-    });
+  var cl=closed();
+  var openedSigs=db.signals.filter(function(s){return s.result==='OPENED';});
+  var unmatched=openedSigs.filter(function(s){
+    return !db.trades.some(function(t){return t.symbol===s.symbol&&(t.direction||'').toUpperCase()===(s.direction||'').toUpperCase()&&(t.ts||'').slice(0,13)===(s.ts||'').slice(0,13);});
   });
-
-  document.getElementById('tab-execution').innerHTML =
+  document.getElementById('tab-execution').innerHTML=
   '<div class="kpi-grid">'+
     '<div class="kpi"><div class="kpi-label">Signals Opened</div><div class="kpi-value green">'+openedSigs.length+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Trades in DB</div><div class="kpi-value cyan">'+db.trades.length+'</div><div class="kpi-sub">'+cl.length+' closed &middot; '+opened().length+' open</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Matched</div><div class="kpi-value '+(unmatched.length===0?'green':'gold')+'">'+(openedSigs.length-unmatched.length)+'/'+openedSigs.length+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Unmatched</div><div class="kpi-value '+(unmatched.length===0?'green':'red')+'">'+unmatched.length+'</div></div>'+
   '</div>'+
-  '<div class="card" style="margin-bottom:16px">'+
-    '<div class="card-title">Execution Check '+(unmatched.length===0?'<span class="badge ok">ALL MATCHED</span>':'<span class="badge warn">'+unmatched.length+' UNMATCHED</span>')+'</div>'+
-    (unmatched.length===0
-      ? '<p style="color:var(--green)">&#10003; Every opened signal has a corresponding trade record.</p>'
-      : '<p style="color:var(--gold);margin-bottom:10px">&#9888; '+unmatched.length+' signals could not be matched to a trade within the same hour.</p>'+
-        '<div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Direction</th><th>Signal Time</th></tr></thead>'+
-        '<tbody>'+unmatched.map(function(s){return '<tr><td style="color:var(--cyan)">'+s.sym+'</td><td>'+s.dir+'</td><td style="color:var(--sub)">'+s.ts+'</td></tr>';}).join('')+
-        '</tbody></table></div>')+
+  '<div class="card" style="margin-bottom:16px"><div class="card-title">Execution '+(unmatched.length===0?'<span class="badge ok">ALL MATCHED</span>':'<span class="badge warn">'+unmatched.length+' UNMATCHED</span>')+'</div>'+
+    (unmatched.length===0?'<p style="color:var(--green)">&#10003; Every opened signal has a matching trade.</p>':
+      '<p style="color:var(--gold);margin-bottom:8px">'+unmatched.length+' signals unmatched within same hour.</p>')+
   '</div>'+
-  '<div class="card">'+
-    '<div class="card-title">Recent Closed Trades</div>'+
-    '<div class="tbl-wrap"><table>'+
-      '<thead><tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Strong</th><th>Weak</th><th>Gap</th><th>Lot</th><th>Entry</th><th>P&L</th><th>Cmpd Day</th></tr></thead>'+
-      '<tbody>'+cl.slice(-40).reverse().map(function(t){
-        return '<tr>'+
-          '<td style="color:var(--sub)">'+(t.ts||'').slice(0,16)+'</td>'+
-          '<td style="color:var(--cyan);font-weight:600">'+(t.symbol||'&mdash;')+'</td>'+
-          '<td><span class="badge-'+((t.direction||'').toLowerCase())+'">'+(t.direction||'&mdash;')+'</span></td>'+
-          '<td style="color:var(--green)">'+(t.strong_cur||'&mdash;')+'</td>'+
-          '<td style="color:var(--red)">'+(t.weak_cur||'&mdash;')+'</td>'+
-          '<td>'+(t.gap?parseFloat(t.gap).toFixed(3):'&mdash;')+'</td>'+
-          '<td>'+parseFloat(t.lot||0).toFixed(2)+'</td>'+
-          '<td>'+parseFloat(t.entry||0).toFixed(5)+'</td>'+
-          '<td style="color:'+(pnl(t)>=0?'var(--green)':'var(--red)')+';font-weight:700">'+fmtPnl(pnl(t))+'</td>'+
-          '<td style="color:var(--sub)">'+(t.compound_day||'&mdash;')+'</td>'+
-        '</tr>';
-      }).join('')+
-      '</tbody></table></div>'+
-  '</div>';
+  '<div class="card"><div class="card-title">Recent Closed Trades</div><div class="tbl-wrap"><table>'+
+    '<thead><tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Strong</th><th>Weak</th><th>Gap</th><th>Lot</th><th>Entry</th><th>P&L</th><th>Day</th></tr></thead>'+
+    '<tbody>'+cl.slice(-40).reverse().map(function(t){
+      return '<tr><td style="color:var(--sub)">'+(t.ts||'').slice(0,16)+'</td>'+
+        '<td style="color:var(--cyan);font-weight:600">'+(t.symbol||'')+'</td>'+
+        '<td><span class="badge-'+((t.direction||'').toLowerCase())+'">'+(t.direction||'')+'</span></td>'+
+        '<td style="color:var(--green)">'+(t.strong_cur||'&mdash;')+'</td><td style="color:var(--red)">'+(t.weak_cur||'&mdash;')+'</td>'+
+        '<td>'+(t.gap?parseFloat(t.gap).toFixed(3):'&mdash;')+'</td>'+
+        '<td>'+parseFloat(t.lot||0).toFixed(2)+'</td><td>'+parseFloat(t.entry||0).toFixed(5)+'</td>'+
+        '<td style="color:'+(pnl(t)>=0?'var(--green)':'var(--red)')+';font-weight:700">'+fmtPnl(pnl(t))+'</td>'+
+        '<td style="color:var(--sub)">'+(t.compound_day||'&mdash;')+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
 }
 
-// ── MANAGEMENT ────────────────────────────────────────────────────
 function renderManagement() {
-  var cl = closed();
-  var wins = cl.filter(function(t){return pnl(t)>0;});
-  var losses = cl.filter(function(t){return pnl(t)<0;});
-  var avgW = wins.length ? wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length : 0;
-  var avgL = losses.length ? Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length) : 0;
-  var rrRatio = avgL>0 ? avgW/avgL : 0;
-
-  // Partial closes: tickets appearing more than once across OPEN+CLOSE
-  var ticketMap = {};
-  db.trades.forEach(function(t){if(!t.ticket) return; ticketMap[t.ticket]=ticketMap[t.ticket]||[]; ticketMap[t.ticket].push(t);});
-  var partialCloses = Object.entries(ticketMap).filter(function(e){return e[1].length>2;});
-
-  // Compound target hits from daily table (using correct field names)
-  var targetHits = db.daily.filter(function(d){return d.target_hit===true;});
-
-  document.getElementById('tab-management').innerHTML =
+  var cl=closed();
+  var wins=cl.filter(function(t){return pnl(t)>0;});
+  var losses=cl.filter(function(t){return pnl(t)<0;});
+  var avgW=wins.length?wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length:0;
+  var avgL=losses.length?Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length):0;
+  var rrRatio=avgL>0?avgW/avgL:0;
+  var ticketMap={};
+  db.trades.forEach(function(t){if(!t.ticket)return;ticketMap[t.ticket]=ticketMap[t.ticket]||[];ticketMap[t.ticket].push(t);});
+  var partials=Object.entries(ticketMap).filter(function(e){return e[1].length>2;});
+  var targetHits=db.daily.filter(function(d){return d.target_hit===true;});
+  document.getElementById('tab-management').innerHTML=
   '<div class="kpi-grid">'+
     '<div class="kpi"><div class="kpi-label">Avg Win</div><div class="kpi-value green">+'+avgW.toFixed(2)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Avg Loss</div><div class="kpi-value red">-'+avgL.toFixed(2)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">W/L Ratio</div><div class="kpi-value '+(rrRatio>=1?'green':'gold')+'">'+rrRatio.toFixed(2)+'x</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Partial Closes</div><div class="kpi-value cyan">'+partialCloses.length+'</div><div class="kpi-sub">tickets with &gt;2 rows</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Partial Closes</div><div class="kpi-value cyan">'+partials.length+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Target Hit Days</div><div class="kpi-value gold">'+targetHits.length+'</div></div>'+
   '</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
-    '<div class="card"><div class="card-title">Compound Target Hit Days</div>'+
-      (targetHits.length===0
-        ? '<p style="color:var(--sub)">No target hit days found yet.</p>'
-        : targetHits.map(function(d){
-            return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-              '<div style="display:flex;justify-content:space-between">'+
-                '<span style="color:var(--cyan)">'+d.date+'</span>'+
-                '<span style="color:var(--green);font-weight:700">+$'+parseFloat(d.daily_pnl||0).toFixed(2)+'</span>'+
-              '</div>'+
-              '<div style="font-size:10px;color:var(--sub)">Day '+d.compound_day+' &middot; Target $'+parseFloat(d.compound_target||0).toFixed(2)+' &middot; Lot '+parseFloat(d.compound_lot||0).toFixed(2)+'</div>'+
-            '</div>';
-          }).join(''))+
+    '<div class="card"><div class="card-title">Target Hit Days</div>'+
+      (targetHits.length===0?'<p style="color:var(--sub)">No target hit days yet.</p>':
+        targetHits.map(function(d){
+          return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+            '<div style="display:flex;justify-content:space-between"><span style="color:var(--cyan)">'+d.date+'</span>'+
+            '<span style="color:var(--green);font-weight:700">+$'+parseFloat(d.daily_pnl||0).toFixed(2)+'</span></div>'+
+            '<div style="font-size:10px;color:var(--sub)">Day '+d.compound_day+' &middot; Target $'+parseFloat(d.compound_target||0).toFixed(2)+' &middot; Lot '+parseFloat(d.compound_lot||0).toFixed(2)+'</div></div>';
+        }).join(''))+
     '</div>'+
-    '<div class="card"><div class="card-title">Multi-Row Tickets (Partial TP Evidence)</div>'+
-      (partialCloses.length===0
-        ? '<p style="color:var(--sub)">No partial close sequences detected yet.</p>'
-        : partialCloses.slice(0,10).map(function(e){
-            var rows=e[1];
-            return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-              '<div style="color:var(--cyan);font-weight:600">#'+e[0]+' &mdash; '+(rows[0]&&rows[0].symbol||'?')+'</div>'+
-              '<div style="font-size:10px;color:var(--sub)">'+rows.length+' rows &middot; events: '+rows.map(function(r){return r.event||'?';}).join(', ')+'</div>'+
-            '</div>';
-          }).join(''))+
+    '<div class="card"><div class="card-title">Multi-Row Tickets (Partial TP)</div>'+
+      (partials.length===0?'<p style="color:var(--sub)">No partial close sequences yet.</p>':
+        partials.slice(0,10).map(function(e){
+          return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+            '<div style="color:var(--cyan);font-weight:600">#'+e[0]+' &mdash; '+(e[1][0]&&e[1][0].symbol||'?')+'</div>'+
+            '<div style="font-size:10px;color:var(--sub)">'+e[1].length+' rows: '+e[1].map(function(r){return r.event;}).join(', ')+'</div></div>';
+        }).join(''))+
     '</div>'+
   '</div>';
 }
 
-// ── COMPOUND ──────────────────────────────────────────────────────
 function renderCompound() {
-  // Use correct field names: start_balance, end_balance, compound_lot, compound_target, target_hit
-  var daily = db.daily.slice().sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
-  if(!daily.length) {
-    document.getElementById('tab-compound').innerHTML='<div class="card"><p style="color:var(--sub)">No daily data loaded.</p></div>';
-    return;
-  }
-
-  var days = daily.map(function(d){
-    var dpnl = parseFloat(d.daily_pnl||0);
-    var target = parseFloat(d.compound_target||0);
-    var endBal = parseFloat(d.end_balance||0);
-    var status = d.target_hit===true?'win':dpnl<0?'loss':dpnl>0?'partial':'open';
-    return {date:d.date,dpnl:dpnl,target:target,endBal:endBal,cday:d.compound_day,status:status,lot:d.compound_lot,startBal:parseFloat(d.start_balance||0)};
+  var daily=db.daily.slice().sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+  if(!daily.length){document.getElementById('tab-compound').innerHTML='<div class="card"><p style="color:var(--sub)">No daily data.</p></div>';return;}
+  var days=daily.map(function(d){
+    var dpnl=parseFloat(d.daily_pnl||0);
+    var target=parseFloat(d.compound_target||0);
+    var endBal=parseFloat(d.end_balance||0);
+    var status=d.target_hit===true?'win':dpnl<0?'loss':dpnl>0?'partial':'open';
+    return {date:d.date,dpnl:dpnl,target:target,endBal:endBal,cday:d.compound_day,status:status,lot:d.compound_lot};
   });
-
-  var winDays = days.filter(function(d){return d.status==='win';}).length;
-  var lossDays = days.filter(function(d){return d.status==='loss';}).length;
-  var partialDays = days.filter(function(d){return d.status==='partial';}).length;
-  var latestDay = days[days.length-1];
-  var totalPnlAll = days.reduce(function(s,d){return s+d.dpnl;},0);
-
-  document.getElementById('tab-compound').innerHTML =
+  var winDays=days.filter(function(d){return d.status==='win';}).length;
+  var lossDays=days.filter(function(d){return d.status==='loss';}).length;
+  var latestDay=days[days.length-1];
+  document.getElementById('tab-compound').innerHTML=
   '<div class="kpi-grid">'+
-    '<div class="kpi"><div class="kpi-label">Current Balance</div><div class="kpi-value green">$'+(latestDay?latestDay.endBal.toFixed(2):'--')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Balance (last row)</div><div class="kpi-value green">$'+(latestDay?latestDay.endBal.toFixed(2):'--')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Compound Day</div><div class="kpi-value cyan">'+(latestDay&&latestDay.cday?'Day '+latestDay.cday:'--')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Current Lot</div><div class="kpi-value gold">'+(latestDay&&latestDay.lot?parseFloat(latestDay.lot).toFixed(2)+'L':'--')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Target Days Hit</div><div class="kpi-value green">'+winDays+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Target Hit Days</div><div class="kpi-value green">'+winDays+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Loss Days</div><div class="kpi-value red">'+lossDays+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Partial Days</div><div class="kpi-value gold">'+partialDays+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Total Days</div><div class="kpi-value">'+days.length+'</div></div>'+
   '</div>'+
-  '<div class="card">'+
-    '<div class="card-title">Day-by-Day Compound Progress</div>'+
-    '<div class="compound-grid">'+
-      days.map(function(d){
-        return '<div class="day-card '+d.status+'">'+
-          '<div class="day-num">Day '+(d.cday||'?')+' &middot; '+d.date+'</div>'+
-          '<div class="day-pnl '+(d.dpnl>=0?'green':'red')+'">'+fmtPnl(d.dpnl)+'</div>'+
-          '<div class="day-meta">Target: '+(d.target>0?'+$'+d.target.toFixed(2):'&mdash;')+'</div>'+
-          '<div class="day-meta">Bal: $'+d.endBal.toFixed(2)+'</div>'+
-          (d.lot?'<div class="day-meta">Lot: '+parseFloat(d.lot).toFixed(2)+'</div>':'')+
-        '</div>';
-      }).join('')+
-    '</div>'+
-  '</div>';
+  '<div class="card"><div class="card-title">Day-by-Day Progress</div><div class="compound-grid">'+
+    days.map(function(d){
+      return '<div class="day-card '+d.status+'">'+
+        '<div class="day-num">Day '+(d.cday||'?')+' &middot; '+d.date+'</div>'+
+        '<div class="day-pnl '+(d.dpnl>=0?'green':'red')+'">'+fmtPnl(d.dpnl)+'</div>'+
+        '<div class="day-meta">Target: '+(d.target>0?'+$'+d.target.toFixed(2):'&mdash;')+'</div>'+
+        '<div class="day-meta">Bal: $'+d.endBal.toFixed(2)+'</div>'+
+        (d.lot?'<div class="day-meta">Lot: '+parseFloat(d.lot).toFixed(2)+'</div>':'')+
+      '</div>';
+    }).join('')+
+  '</div></div>';
 }
 
-// ── ANOMALIES ──────────────────────────────────────────────────────
 function renderAnomalies() {
-  var cl = closed();
-  var anomalies = [];
-
-  // Orphaned OPENs (no matching CLOSE)
-  var orphanOPENs = db.trades.filter(function(t){
-    if(t.event!=='OPEN') return false;
+  var cl=closed(); var anomalies=[];
+  var orphans=db.trades.filter(function(t){
+    if(t.event!=='OPEN')return false;
     return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});
   });
-  if(orphanOPENs.length>0) {
-    anomalies.push({type:'warn',label:'Orphaned OPEN Records ('+orphanOPENs.length+')',
-      detail:'OPENs with no matching CLOSE: '+orphanOPENs.map(function(t){return t.symbol+' #'+t.ticket+' '+t.ts.slice(0,10);}).join(', ')+'. These may be currently open positions or stale pre-clean-start records.'});
-  }
-
-  // Duplicate close tickets
-  var closeTickets = cl.map(function(t){return t.ticket;}).filter(Boolean);
-  var dupTickets = closeTickets.filter(function(t,i){return closeTickets.indexOf(t)!==i;});
-  if(dupTickets.length>0) {
-    anomalies.push({type:'warn',label:'Duplicate Close Tickets',
-      detail:[...new Set(dupTickets)].length+' tickets appear more than once in close events: '+[...new Set(dupTickets)].slice(0,5).join(', ')});
-  }
-
-  // Trades missing currency data
-  var missingCurr = cl.filter(function(t){return !t.strong_cur||!t.weak_cur;});
-  if(missingCurr.length>0) {
-    anomalies.push({type:'warn',label:'Trades Missing Currency Fields ('+missingCurr.length+')',
-      detail:missingCurr.length+'/'+cl.length+' closed trades missing strong_cur/weak_cur. Expected for COMPOUND_CLOSE events from pre-v3.48.'});
-  }
-
-  // Big wins (TP2 or compound close indicators)
-  var avgWin = cl.filter(function(t){return pnl(t)>0;}).reduce(function(s,t){return s+pnl(t);},0)/(cl.filter(function(t){return pnl(t)>0;}).length||1);
-  var bigWins = cl.filter(function(t){return pnl(t)>avgWin*2.5&&pnl(t)>0;});
-  if(bigWins.length>0) {
-    anomalies.push({type:'ok',label:'Big Winners &mdash; '+bigWins.length+' trades (TP2 or compound close)',
-      detail:bigWins.slice(0,4).map(function(t){return t.symbol+' '+fmtPnl(pnl(t));}).join(', ')});
-  }
-
-  // Signals opened below gap threshold
-  var lowGap = db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.5;});
-  if(lowGap.length>0) {
-    anomalies.push({type:'fail',label:'Signals Opened Below Gap Threshold (<0.5)',
-      detail:lowGap.length+' signals: '+lowGap.map(function(s){return s.symbol+' gap='+parseFloat(s.gap).toFixed(3);}).join(', ')});
-  }
-
-  if(anomalies.length===0) {
-    anomalies.push({type:'ok',label:'No anomalies detected',detail:'All checks passed. Data looks clean and consistent.'});
-  }
-
-  document.getElementById('tab-anomalies').innerHTML =
-  '<div class="card">'+
-    '<div class="card-title">Anomaly Report <span class="badge '+(anomalies.some(function(a){return a.type==='fail';})?'fail':anomalies.some(function(a){return a.type==='warn';})?'warn':'ok')+'">'+anomalies.length+' items</span></div>'+
-    '<div class="check-grid">'+
-      anomalies.map(function(a){
-        return '<div class="check-row">'+
-          '<div class="check-icon">'+(a.type==='ok'?'&#10003;':a.type==='warn'?'&#9888;':'&#10007;')+'</div>'+
-          '<div><div class="check-label">'+a.label+'</div><div class="check-detail">'+a.detail+'</div></div>'+
-        '</div>';
-      }).join('')+
-    '</div>'+
-  '</div>';
+  if(orphans.length>0) anomalies.push({type:'warn',label:'Orphaned OPEN Records ('+orphans.length+')',
+    detail:orphans.map(function(t){return t.symbol+' #'+t.ticket+' '+t.ts.slice(0,10);}).join(', ')+' &mdash; may be current positions or stale records'});
+  var closeTickets=cl.map(function(t){return t.ticket;}).filter(Boolean);
+  var dups=closeTickets.filter(function(t,i){return closeTickets.indexOf(t)!==i;});
+  if(dups.length>0) anomalies.push({type:'warn',label:'Duplicate Close Tickets',[...new Set(dups)].length+' tickets appear twice',
+    detail:[...new Set(dups)].slice(0,5).join(', ')});
+  var missingCurr=cl.filter(function(t){return !t.strong_cur||!t.weak_cur;});
+  if(missingCurr.length>0) anomalies.push({type:'warn',label:'Missing Currency Fields ('+missingCurr.length+')',
+    detail:missingCurr.length+'/'+cl.length+' trades missing strong_cur/weak_cur (expected for pre-v3.48 or COMPOUND_CLOSE)'});
+  var avgWin=cl.filter(function(t){return pnl(t)>0;}).reduce(function(s,t){return s+pnl(t);},0)/(cl.filter(function(t){return pnl(t)>0;}).length||1);
+  var bigWins=cl.filter(function(t){return pnl(t)>avgWin*2.5&&pnl(t)>0;});
+  if(bigWins.length>0) anomalies.push({type:'ok',label:'Big Winners ('+bigWins.length+') &mdash; TP2 or Compound Close',
+    detail:bigWins.slice(0,4).map(function(t){return t.symbol+' '+fmtPnl(pnl(t));}).join(', ')});
+  var lowGap=db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.5;});
+  if(lowGap.length>0) anomalies.push({type:'fail',label:'Signals Below Gap Threshold (<0.5)',
+    detail:lowGap.map(function(s){return s.symbol+' gap='+parseFloat(s.gap).toFixed(3);}).join(', ')});
+  if(anomalies.length===0) anomalies.push({type:'ok',label:'No anomalies detected',detail:'All checks passed.'});
+  document.getElementById('tab-anomalies').innerHTML=
+  '<div class="card"><div class="card-title">Anomaly Report <span class="badge '+(anomalies.some(function(a){return a.type==='fail';})?'fail':anomalies.some(function(a){return a.type==='warn';})?'warn':'ok')+'">'+anomalies.length+' items</span></div>'+
+  '<div class="check-grid">'+anomalies.map(function(a){
+    return '<div class="check-row"><div class="check-icon">'+(a.type==='ok'?'&#10003;':a.type==='warn'?'&#9888;':'&#10007;')+'</div>'+
+      '<div><div class="check-label">'+a.label+'</div><div class="check-detail">'+a.detail+'</div></div></div>';
+  }).join('')+'</div></div>';
 }
 
 init();
