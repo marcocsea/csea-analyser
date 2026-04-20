@@ -355,7 +355,7 @@ function renderCompound() {
   var latestDay=days[days.length-1];
   document.getElementById('tab-compound').innerHTML=
   '<div class="kpi-grid">'+
-    '<div class="kpi"><div class="kpi-label">Balance (last row)</div><div class="kpi-value green">$'+(latestDay?latestDay.endBal.toFixed(2):'--')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Balance (last row)</div><div class="kpi-value green">£'+(latestDay?latestDay.endBal.toFixed(2):'--')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Compound Day</div><div class="kpi-value blue">'+(latestDay&&latestDay.cday?'Day '+latestDay.cday:'--')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Current Lot</div><div class="kpi-value gold">'+(latestDay&&latestDay.lot?parseFloat(latestDay.lot).toFixed(2)+'L':'--')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Target Hit Days</div><div class="kpi-value green">'+winDays+'</div></div>'+
