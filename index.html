@@ -62,7 +62,6 @@ tr:hover td{background:var(--bg3)}
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 .list-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
 .list-row:last-child{border-bottom:none}
-.hidden{display:none}
 .dir-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
 .dir-card{border-radius:8px;padding:14px;border:2px solid}
 .dir-card.buy{background:#f0fdf4;border-color:#16a34a}
@@ -98,8 +97,8 @@ tr:hover td{background:var(--bg3)}
   <select id="acctSel"><option value="">Loading...</option></select>
   <select id="periodSel" onchange="onPeriodChange()">
     <option value="2026-04-28" selected>v3.74+ &mdash; 28 Apr 2026</option>
-    <option value="2026-04-17">v3.71+ &mdash; 17 Apr 2026</option>
     <option value="2026-04-23">v3.73+ &mdash; 23 Apr 2026</option>
+    <option value="2026-04-17">v3.71+ &mdash; 17 Apr 2026</option>
     <option value="2026-03-23">v3.67+ &mdash; 23 Mar 2026</option>
     <option value="">All data</option>
     <option value="custom">Custom range...</option>
@@ -164,7 +163,7 @@ async function init() {
     accounts = all;
     var sel = document.getElementById('acctSel');
     sel.innerHTML = '<option value="ALL">All CSEA Accounts</option>' +
-      accounts.map(function(a){return '<option value="'+a.id+'">'+a.label+' (#'+a.account_number+')</option>';}).join('');
+      accounts.map(function(a){return '<option value="'+a.id+'">' +a.label+' (#'+a.account_number+')</option>';}).join('');
     document.getElementById('loadBtn').disabled = false;
     setStatus('Ready &mdash; select period and load');
   } catch(e) {
@@ -177,8 +176,7 @@ async function loadAll() {
   var periodVal = document.getElementById('periodSel').value;
   var fromDate = periodVal === 'custom' ? document.getElementById('customFrom').value : periodVal;
   var toDate = periodVal === 'custom' ? document.getElementById('customTo').value : '';
-  g_fromDate = fromDate;
-  g_toDate = toDate;
+  g_fromDate = fromDate; g_toDate = toDate;
   document.getElementById('loadBtn').disabled = true;
   document.getElementById('exportBtn').disabled = true;
   setStatus('<span class="spinner"></span>Fetching data...');
@@ -226,12 +224,8 @@ function runAnalysis() {
     '&#128197; <strong>'+g_periodLabel+'</strong>' +
     ' &nbsp;&middot;&nbsp; <strong>'+g_acctLabel+'</strong>' +
     ' &nbsp;&middot;&nbsp; '+db.trades.length+' trade events &middot; '+db.signals.length+' signals';
-  renderOverview();
-  renderSignals();
-  renderExecution();
-  renderManagement();
-  renderDaily();
-  renderAnomalies();
+  renderOverview(); renderSignals(); renderExecution();
+  renderManagement(); renderDaily(); renderAnomalies();
 }
 
 function closed() {
@@ -239,10 +233,34 @@ function closed() {
     return (t.event==='CLOSE'||t.event==='COMPOUND_CLOSE') && parseFloat(t.pnl||0) !== 0;
   });
 }
-function opened() { return db.trades.filter(function(t){return t.event==='OPEN';}); }
+function opened() { return db.trades.filter(function(t){return t.event==='OPEN';});}
 function pnl(t) { return parseFloat(t.pnl||0); }
-function fmtPnl(v) { return (v>=0?'+':'')+v.toFixed(2); }
+function fmtPnl(v) { return (v>=0?'+':-'')+v.toFixed(2); }
 function fmtDate(s) { return s ? s.slice(0,10) : ''; }
+
+function indicatorComparePanel(){
+  var FREE_ID='20e66a96-917d-4233-ac1a-4ba39c7c806c';
+  var PAID_ID='fd373385-1868-4571-8e61-d0fdc9dc17f6';
+  var freeCl=db.trades.filter(function(t){return t.account_id===FREE_ID&&(t.event==='CLOSE'||t.event==='COMPOUND_CLOSE')&&parseFloat(t.pnl||0)!==0;});
+  var paidCl=db.trades.filter(function(t){return t.account_id===PAID_ID&&(t.event==='CLOSE'||t.event==='COMPOUND_CLOSE')&&parseFloat(t.pnl||0)!==0;});
+  if(!freeCl.length&&!paidCl.length)return'';
+  var agreed=[],paidOnly=[],freeOnly=[];
+  freeCl.forEach(function(ft){var fd=(ft.ts||'').slice(0,10);var m=paidCl.find(function(pt){return pt.symbol===ft.symbol&&pt.direction===ft.direction&&(pt.ts||'').slice(0,10)===fd;});if(m)agreed.push({free:ft,paid:m});else freeOnly.push(ft);});
+  paidCl.forEach(function(pt){var pd=(pt.ts||'').slice(0,10);if(!freeCl.find(function(ft){return ft.symbol===pt.symbol&&ft.direction===pt.direction&&(ft.ts||'').slice(0,10)===pd;}))paidOnly.push(pt);});
+  var total=agreed.length+freeOnly.length+paidOnly.length;
+  var agreePct=total?(agreed.length/total*100).toFixed(0):0;
+  function wrOf(arr,field){if(!arr.length)return'—';var w=arr.filter(function(x){return parseFloat((field?x[field]:x).pnl||0)>0;}).length;return(w/arr.length*100).toFixed(1)+'%';}
+  var h='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;margin-bottom:16px">';
+  h+='<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:12px">&#9878; Free vs Paid Indicator — Quick Comparison</div>';
+  if(!freeCl.length){h+='<div style="font-size:12px;color:#64748b">Free indicator (109218) has no closed trades yet — data accumulating.</div></div>';return h;}
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">';
+  h+='<div style="text-align:center;background:#fff;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:800;color:#1e40af">'+agreePct+'%</div><div style="font-size:10px;color:#64748b">Agreement Rate</div></div>';
+  h+='<div style="text-align:center;background:#dcfce7;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:800;color:#16a34a">'+agreed.length+'</div><div style="font-size:10px;color:#166534">Both Took ('+wrOf(agreed,'free')+' / '+wrOf(agreed,'paid')+')</div></div>';
+  h+='<div style="text-align:center;background:#fef3c7;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:800;color:#d97706">'+paidOnly.length+'</div><div style="font-size:10px;color:#92400e">Paid-Only WR: '+wrOf(paidOnly)+'</div></div>';
+  h+='<div style="text-align:center;background:#dbeafe;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:800;color:#1e40af">'+freeOnly.length+'</div><div style="font-size:10px;color:#1e40af">Free-Only WR: '+wrOf(freeOnly)+'</div></div>';
+  h+='</div></div>';
+  return h;
+}
 
 function renderOverview() {
   var cl = closed();
@@ -270,7 +288,7 @@ function renderOverview() {
   var failC = checks.filter(function(c){return c.status==='fail';}).length;
   var overallCls = failC>0?'fail':warnC>0?'warn':'ok';
   var overallTxt = failC>0?'ISSUES FOUND':warnC>0?'WARNINGS':'ALL CLEAR';
-  document.getElementById('tab-overview').innerHTML =
+  document.getElementById('tab-overview').innerHTML = indicatorComparePanel() +
   '<div class="kpi-grid">'+
     kpi('System Health', overallTxt, passC+' pass &middot; '+warnC+' warn &middot; '+failC+' fail', failC>0?'red':warnC>0?'gold':'green')+
     kpi('Total P&L', fmtPnl(totalPnl), cl.length+' closed trades', totalPnl>=0?'green':'red')+
@@ -294,7 +312,7 @@ function renderOverview() {
       '<div class="dir-meta">Avg: '+(sells.length?fmtPnl(sellPnl/sells.length):'--')+'</div></div>'+
   '</div>'+
   '<div class="two-col">'+
-    '<div class="card"><div class="card-title">Health Checks <span class="badge '+overallCls+'">'+passC+'/'+checks.length+' PASS</span></div>'+
+    '<div class="card"><div class="card-title">Health Checks <span class="badge '+overallCls+'">' +passC+'/'+ checks.length+' PASS</span></div>'+
       '<div class="check-grid">'+checks.map(function(c){
         return '<div class="check-row"><div class="check-icon">'+(c.status==='ok'?'&#10003;':c.status==='warn'?'&#9888;':c.status==='info'?'&#9432;':'&#10007;')+'</div>'+
           '<div><div class="check-label">'+c.label+'</div><div class="check-detail">'+c.detail+'</div></div></div>';
@@ -309,115 +327,70 @@ function renderOverview() {
 }
 
 function kpi(label, value, sub, cls) {
-  return '<div class="kpi"><div class="kpi-label">'+label+'</div><div class="kpi-value '+(cls||'')+'">'+value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+' </div>';
+  return '<div class="kpi"><div class="kpi-label">'+label+'</div><div class="kpi-value '+(cls||'')+'">' +value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+' </div>';
 }
 
 function topPairs(cl, limit) {
   var map = {};
-  cl.forEach(function(t){
-    var s = t.symbol||'?';
-    if (!map[s]) map[s] = {total:0,w:0,l:0};
-    map[s].total += pnl(t);
-    if (pnl(t)>0) map[s].w++; else map[s].l++;
-  });
+  cl.forEach(function(t){var s=t.symbol||'?';if(!map[s])map[s]={total:0,w:0,l:0};map[s].total+=pnl(t);if(pnl(t)>0)map[s].w++;else map[s].l++;});
   var arr = Object.keys(map).map(function(s){return {sym:s,total:map[s].total,w:map[s].w,l:map[s].l};});
   arr.sort(function(a,b){return b.total-a.total;});
-  if (!arr.length) return '<p style="color:var(--sub);font-size:11px">No data.</p>';
+  if(!arr.length) return '<p style="color:var(--sub);font-size:11px">No data.</p>';
   return arr.slice(0,limit).map(function(r){
     return '<div class="list-row"><span style="color:#1e40af;font-weight:600">'+r.sym+'</span>'+
       '<span style="font-size:11px;color:var(--sub)">'+r.w+'W/'+r.l+'L</span>'+
-      '<span style="font-weight:700;'+(r.total>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(r.total)+'</span></div>';
+      '<span style="font-weight:700;'+(r.total>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(r.total)+'</span></div>';
   }).join('');
 }
 
 function getHealthChecks() {
-  var cl = closed();
-  var checks = [];
-  checks.push({
-    label:'Supabase Connectivity',
-    status: db.trades.length>0?'ok':'fail',
-    detail: db.trades.length>0
-      ? db.trades.length+' trade events &middot; '+db.signals.length+' signals &middot; '+db.daily.length+' daily rows'
-      : 'No data — check InpUserID and InpPlatformAPIKey in EA'
-  });
-  var recentCutoff = new Date(Date.now()-7*86400000).toISOString();
-  var recentTrades = db.trades.filter(function(t){return (t.ts||'')>recentCutoff;});
-  checks.push({
-    label:'Recent Push Activity (7 days)',
-    status: recentTrades.length>0?'ok':'warn',
-    detail: recentTrades.length>0
-      ? recentTrades.length+' events in last 7 days — push is working'
-      : 'No events in last 7 days — EA may be offline or push disabled'
-  });
-  var openedSigs = db.signals.filter(function(s){return s.result==='OPENED'&&s.gap!=null;});
-  var lowGap = openedSigs.filter(function(s){return parseFloat(s.gap)<0.3;});
-  checks.push({
-    label:'Gap Threshold (\u22650.3 — v3.74)',
-    status: lowGap.length===0?'ok':lowGap.length<3?'warn':'fail',
-    detail: lowGap.length===0
-      ? 'All '+openedSigs.length+' signals meet \u22650.3 threshold'
-      : lowGap.length+' signals below threshold: '+lowGap.map(function(s){return s.symbol+' '+parseFloat(s.gap).toFixed(3);}).join(', ')
-  });
-  var orphaned = db.trades.filter(function(t){
-    if (t.event!=='OPEN') return false;
-    return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});
-  });
-  checks.push({
-    label:'Orphaned OPEN Records',
-    status: orphaned.length===0?'ok':orphaned.length<=3?'warn':'fail',
-    detail: orphaned.length===0
-      ? 'All OPENs have matching CLOSEs'
-      : orphaned.length+' OPENs without matching CLOSE — likely current open positions'
-  });
-  var dups = cl.map(function(t){return t.ticket;}).filter(Boolean);
-  var dupSet = dups.filter(function(v,i){return dups.indexOf(v)!==i;});
-  checks.push({
-    label:'Duplicate Close Tickets',
-    status: dupSet.length===0?'ok':'warn',
-    detail: dupSet.length===0
-      ? 'No duplicate close tickets'
-      : dupSet.length+' duplicate tickets: '+[...new Set(dupSet)].slice(0,4).join(', ')
-  });
-  var missGap = openedSigs.filter(function(s){return !s.gap||parseFloat(s.gap)===0;});
-  checks.push({
-    label:'Signal Currency Fields',
-    status: db.signals.length>0&&(db.signals.length-missGap.length)>0?'ok':'warn',
-    detail: db.signals.length===0
-      ? 'No signal data'
-      : (db.signals.length-missGap.length)+'/'+db.signals.length+' signals have gap data'
-  });
+  var cl = closed(); var checks = [];
+  checks.push({label:'Supabase Connectivity',status:db.trades.length>0?'ok':'fail',
+    detail:db.trades.length>0?db.trades.length+' trade events &middot; '+db.signals.length+' signals &middot; '+db.daily.length+' daily rows':'No data — check InpUserID and InpPlatformAPIKey in EA'});
+  var cutoff=new Date(Date.now()-7*86400000).toISOString();
+  var recent=db.trades.filter(function(t){return(t.ts||'')>cutoff;});
+  checks.push({label:'Recent Push Activity (7 days)',status:recent.length>0?'ok':'warn',
+    detail:recent.length>0?recent.length+' events in last 7 days — push working':'No events in last 7 days — EA may be offline'});
+  var openedSigs=db.signals.filter(function(s){return s.result==='OPENED'&&s.gap!=null;});
+  var lowGap=openedSigs.filter(function(s){return parseFloat(s.gap)<0.3;});
+  checks.push({label:'Gap Threshold (\u22650.3 v3.74)',status:lowGap.length===0?'ok':lowGap.length<3?'warn':'fail',
+    detail:lowGap.length===0?'All '+openedSigs.length+' signals meet threshold':lowGap.length+' below threshold: '+lowGap.map(function(s){return s.symbol+' '+parseFloat(s.gap).toFixed(3);}).join(', ')});
+  var orphaned=db.trades.filter(function(t){if(t.event!=='OPEN')return false;return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});});
+  checks.push({label:'Orphaned OPEN Records',status:orphaned.length===0?'ok':orphaned.length<=3?'warn':'fail',
+    detail:orphaned.length===0?'All OPENs have matching CLOSEs':orphaned.length+' OPENs without CLOSE — likely current positions'});
+  var closeTickets=cl.map(function(t){return t.ticket;}).filter(Boolean);
+  var dupSet=closeTickets.filter(function(v,i){return closeTickets.indexOf(v)!==i;});
+  checks.push({label:'Duplicate Close Tickets',status:dupSet.length===0?'ok':'warn',
+    detail:dupSet.length===0?'No duplicate close tickets':dupSet.length+' duplicates: '+[...new Set(dupSet)].slice(0,4).join(', ')});
+  var missGap=openedSigs.filter(function(s){return !s.gap||parseFloat(s.gap)===0;});
+  checks.push({label:'Signal Currency Fields',status:db.signals.length>0&&(db.signals.length-missGap.length)>0?'ok':'warn',
+    detail:db.signals.length===0?'No signal data':(db.signals.length-missGap.length)+'/' +db.signals.length+' signals have gap data'});
   return checks;
 }
 
 function renderSignals() {
-  var sigs = db.signals;
-  if (!sigs.length) { document.getElementById('tab-signals').innerHTML='<div class="card"><p style="color:var(--sub)">No signal data loaded.</p></div>'; return; }
-  var opened_s = sigs.filter(function(s){return s.result==='OPENED';});
-  var blocked = sigs.filter(function(s){return s.result!=='OPENED'&&s.result!=='WAITING'&&s.result!=='DUPLICATE'&&s.result!=='QUEUE_FULL';});
-  var queued = sigs.filter(function(s){return s.result==='WAITING';});
-  var reasons = {};
-  blocked.forEach(function(s){var r=s.block_reason||s.result||'Unknown';reasons[r]=(reasons[r]||0)+1;});
-  var gaps = opened_s.map(function(s){return parseFloat(s.gap||0);}).filter(function(v){return !isNaN(v)&&v>0;});
-  var avgGap = gaps.length ? gaps.reduce(function(a,b){return a+b;},0)/gaps.length : 0;
-  var maxGap = gaps.length ? Math.max.apply(null,gaps) : 0;
-  var symCount = {};
-  opened_s.forEach(function(s){symCount[s.symbol||'?']=(symCount[s.symbol||'?']||0)+1;});
-  var topSyms = Object.entries(symCount).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
-  document.getElementById('tab-signals').innerHTML =
+  var sigs=db.signals;
+  if(!sigs.length){document.getElementById('tab-signals').innerHTML='<div class="card"><p style="color:var(--sub)">No signal data.</p></div>';return;}
+  var opened_s=sigs.filter(function(s){return s.result==='OPENED';});
+  var blocked=sigs.filter(function(s){return s.result!=='OPENED'&&s.result!=='WAITING'&&s.result!=='DUPLICATE'&&s.result!=='QUEUE_FULL';});
+  var queued=sigs.filter(function(s){return s.result==='WAITING';});
+  var reasons={};blocked.forEach(function(s){var r=s.block_reason||s.result||'Unknown';reasons[r]=(reasons[r]||0)+1;});
+  var gaps=opened_s.map(function(s){return parseFloat(s.gap||0);}).filter(function(v){return !isNaN(v)&&v>0;});
+  var avgGap=gaps.length?gaps.reduce(function(a,b){return a+b;},0)/gaps.length:0;
+  var maxGap=gaps.length?Math.max.apply(null,gaps):0;
+  var symCount={};opened_s.forEach(function(s){symCount[s.symbol||'?']=(symCount[s.symbol||'?']||0)+1;});
+  var topSyms=Object.entries(symCount).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  document.getElementById('tab-signals').innerHTML=
   '<div class="kpi-grid">'+
-    kpi('Total Signals', sigs.length+'', '', 'blue')+
-    kpi('Opened', opened_s.length+'', sigs.length?(opened_s.length/sigs.length*100).toFixed(1)+'% of total':'', 'green')+
-    kpi('Blocked', blocked.length+'', '', 'red')+
-    kpi('Queued (LTF)', queued.length+'', '', 'gold')+
-    kpi('Avg Gap (opened)', avgGap.toFixed(3), 'Max: '+maxGap.toFixed(3), 'cyan')+
+    kpi('Total Signals',sigs.length+'','','blue')+kpi('Opened',opened_s.length+'',sigs.length?(opened_s.length/sigs.length*100).toFixed(1)+'% of total':'','green')+
+    kpi('Blocked',blocked.length+'','','red')+kpi('Queued (LTF)',queued.length+'','','gold')+
+    kpi('Avg Gap',avgGap.toFixed(3),'Max: '+maxGap.toFixed(3),'cyan')+
   '</div>'+
   '<div class="two-col" style="margin-bottom:16px">'+
     '<div class="card"><div class="card-title">Block Reasons</div>'+
-      (Object.keys(reasons).length
-        ? Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).map(function(r){
-            return '<div class="list-row"><span style="color:var(--sub);font-size:11px">'+r[0]+'</span><span style="font-weight:700;color:var(--gold)">'+r[1]+'</span></div>';
-          }).join('')
-        : '<p style="color:var(--sub);font-size:11px">No blocked signals.</p>')+
+      (Object.keys(reasons).length?Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).map(function(r){
+        return '<div class="list-row"><span style="color:var(--sub);font-size:11px">'+r[0]+'</span><span style="font-weight:700;color:var(--gold)">'+r[1]+'</span></div>';
+      }).join(''):'<p style="color:var(--sub);font-size:11px">No blocked signals.</p>')+
     '</div>'+
     '<div class="card"><div class="card-title">Top Opened Pairs</div>'+
       topSyms.map(function(s){return '<div class="list-row"><span style="color:#1e40af;font-weight:600">'+s[0]+'</span><span style="font-weight:700">'+s[1]+'</span></div>';}).join('')+
@@ -429,8 +402,7 @@ function renderSignals() {
       return '<tr><td style="color:var(--sub)">'+(s.ts||'').slice(0,16)+'</td>'+
         '<td style="color:#1e40af;font-weight:600">'+(s.symbol||'')+'</td>'+
         '<td><span class="badge-'+((s.direction||'').toLowerCase())+'">'+(s.direction||'')+'</span></td>'+
-        '<td style="color:var(--green)">'+(s.strong_cur||'&mdash;')+'</td>'+
-        '<td style="color:var(--red)">'+(s.weak_cur||'&mdash;')+'</td>'+
+        '<td style="color:var(--green)">'+(s.strong_cur||'&mdash;')+'</td><td style="color:var(--red)">'+(s.weak_cur||'&mdash;')+'</td>'+
         '<td>'+parseFloat(s.gap||0).toFixed(3)+'</td>'+
         '<td><span class="'+(s.result==='OPENED'?'badge-ok':'badge-warn')+'">'+(s.result||'')+'</span></td>'+
         '<td style="color:var(--sub);font-size:10px">'+(s.block_reason||'')+'</td></tr>';
@@ -438,166 +410,120 @@ function renderSignals() {
 }
 
 function renderExecution() {
-  var cl = closed();
-  var openedSigs = db.signals.filter(function(s){return s.result==='OPENED';});
-  document.getElementById('tab-execution').innerHTML =
-  '<div class="kpi-grid">'+
-    kpi('Signals Opened', openedSigs.length+'', '', 'green')+
-    kpi('Trade Events', db.trades.length+'', cl.length+' closed &middot; '+opened().length+' open', 'blue')+
-    kpi('Closed P&L Rows', cl.length+'', 'pnl != 0', 'cyan')+
-  '</div>'+
+  var cl=closed();
+  var openedSigs=db.signals.filter(function(s){return s.result==='OPENED';});
+  document.getElementById('tab-execution').innerHTML=
+  '<div class="kpi-grid">'+kpi('Signals Opened',openedSigs.length+'','','green')+
+    kpi('Trade Events',db.trades.length+'',cl.length+' closed &middot; '+opened().length+' open','blue')+
+    kpi('Closed P&L Rows',cl.length+'','pnl != 0','cyan')+'</div>'+
   '<div class="card"><div class="card-title">All Closed Trades</div><div class="tbl-wrap"><table>'+
     '<thead><tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Lot</th><th>Entry</th><th>SL</th><th>TP</th><th>P&L</th></tr></thead>'+
     '<tbody>'+cl.slice().reverse().map(function(t){
       return '<tr><td style="color:var(--sub)">'+(t.ts||'').slice(0,16)+'</td>'+
         '<td style="color:#1e40af;font-weight:600">'+(t.symbol||'')+'</td>'+
         '<td><span class="badge-'+((t.direction||'').toLowerCase())+'">'+(t.direction||'')+'</span></td>'+
-        '<td>'+parseFloat(t.lot||0).toFixed(2)+'</td>'+
-        '<td>'+parseFloat(t.entry||0).toFixed(5)+'</td>'+
+        '<td>'+parseFloat(t.lot||0).toFixed(2)+'</td><td>'+parseFloat(t.entry||0).toFixed(5)+'</td>'+
         '<td style="color:var(--sub)">'+parseFloat(t.sl||0).toFixed(5)+'</td>'+
         '<td style="color:var(--sub)">'+parseFloat(t.tp||0).toFixed(5)+'</td>'+
-        '<td style="font-weight:700;'+(pnl(t)>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(pnl(t))+'</td></tr>';
+        '<td style="font-weight:700;'+(pnl(t)>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(pnl(t))+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
 }
 
 function renderManagement() {
-  var cl = closed();
-  var wins = cl.filter(function(t){return pnl(t)>0;});
-  var losses = cl.filter(function(t){return pnl(t)<0;});
-  var avgW = wins.length ? wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length : 0;
-  var avgL = losses.length ? Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length) : 0;
-  var rrRatio = avgL>0 ? avgW/avgL : 0;
-  var ticketMap = {};
+  var cl=closed();
+  var wins=cl.filter(function(t){return pnl(t)>0;});
+  var losses=cl.filter(function(t){return pnl(t)<0;});
+  var avgW=wins.length?wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length:0;
+  var avgL=losses.length?Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length):0;
+  var rrRatio=avgL>0?avgW/avgL:0;
+  var ticketMap={};
   db.trades.forEach(function(t){if(!t.ticket)return;ticketMap[t.ticket]=ticketMap[t.ticket]||[];ticketMap[t.ticket].push(t);});
-  var partials = Object.entries(ticketMap).filter(function(e){return e[1].length>2;});
-  var pairMap = {};
-  cl.forEach(function(t){
-    var s = t.symbol||'?';
-    if(!pairMap[s]) pairMap[s]={w:0,l:0,total:0};
-    if(pnl(t)>0) pairMap[s].w++; else pairMap[s].l++;
-    pairMap[s].total += pnl(t);
-  });
-  var pairArr = Object.keys(pairMap).map(function(s){return {sym:s,w:pairMap[s].w,l:pairMap[s].l,total:pairMap[s].total};});
+  var partials=Object.entries(ticketMap).filter(function(e){return e[1].length>2;});
+  var pairMap={};
+  cl.forEach(function(t){var s=t.symbol||'?';if(!pairMap[s])pairMap[s]={w:0,l:0,total:0};if(pnl(t)>0)pairMap[s].w++;else pairMap[s].l++;pairMap[s].total+=pnl(t);});
+  var pairArr=Object.keys(pairMap).map(function(s){return {sym:s,w:pairMap[s].w,l:pairMap[s].l,total:pairMap[s].total};});
   pairArr.sort(function(a,b){return b.total-a.total;});
-  document.getElementById('tab-management').innerHTML =
-  '<div class="kpi-grid">'+
-    kpi('Avg Win', '+'+avgW.toFixed(2), '', 'green')+
-    kpi('Avg Loss', '-'+avgL.toFixed(2), '', 'red')+
-    kpi('W/L Ratio', rrRatio.toFixed(2)+'x', rrRatio>=1?'Favourable':'Inverted — WR compensates', rrRatio>=1?'green':'gold')+
-    kpi('Partial Closes', partials.length+'', 'Multi-row tickets', 'blue')+
-    kpi('Profit Factor', (function(){var g=wins.reduce(function(s,t){return s+pnl(t);},0);var b=Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));return b>0?(g/b).toFixed(2):'&infin;'})(), '', 'cyan')+
-  '</div>'+
+  document.getElementById('tab-management').innerHTML=
+  '<div class="kpi-grid">'+kpi('Avg Win','+' +avgW.toFixed(2),'','green')+kpi('Avg Loss','-'+avgL.toFixed(2),'','red')+
+    kpi('W/L Ratio',rrRatio.toFixed(2)+'x',rrRatio>=1?'Favourable':'Inverted — WR compensates',rrRatio>=1?'green':'gold')+
+    kpi('Partial Closes',partials.length+'','Multi-row tickets','blue')+
+    kpi('Profit Factor',(function(){var g=wins.reduce(function(s,t){return s+pnl(t);},0);var b=Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));return b>0?(g/b).toFixed(2):'&infin;';})()','','cyan')+'</div>'+
   '<div class="two-col">'+
     '<div class="card"><div class="card-title">Pair Performance</div><div class="tbl-wrap"><table>'+
       '<thead><tr><th>Pair</th><th>W</th><th>L</th><th>WR%</th><th>Total P&L</th><th>Avg</th></tr></thead>'+
-      '<tbody>'+pairArr.map(function(r){
-        var cnt=r.w+r.l;
+      '<tbody>'+pairArr.map(function(r){var cnt=r.w+r.l;
         return '<tr><td style="color:#1e40af;font-weight:600">'+r.sym+'</td>'+
           '<td class="green">'+r.w+'</td><td class="red">'+r.l+'</td>'+
           '<td>'+(cnt?(r.w/cnt*100).toFixed(0)+'%':'--')+'</td>'+
-          '<td style="font-weight:700;'+(r.total>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(r.total)+'</td>'+
+          '<td style="font-weight:700;'+(r.total>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(r.total)+'</td>'+
           '<td style="color:var(--sub)">'+(cnt?fmtPnl(r.total/cnt):'--')+'</td></tr>';
       }).join('')+'</tbody></table></div></div>'+
     '<div class="card"><div class="card-title">Partial TP Sequences</div>'+
-      (partials.length===0
-        ? '<p style="color:var(--sub);font-size:11px">No partial close sequences detected.</p>'
-        : '<div class="tbl-wrap">'+partials.slice(0,15).map(function(e){
-            var sym = e[1][0]&&e[1][0].symbol||'?';
-            var events = e[1].map(function(r){return r.event;}).join(', ');
-            var totalPnlVal = e[1].reduce(function(s,r){return s+pnl(r);},0);
-            return '<div class="list-row">'+
-              '<div><span style="color:#1e40af;font-weight:600">#'+e[0]+'</span> <span style="color:var(--sub);font-size:10px">'+sym+'</span></div>'+
-              '<div style="font-size:10px;color:var(--sub)">'+events+'</div>'+
-              '<div style="font-weight:700;'+(totalPnlVal>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(totalPnlVal)+'</div></div>';
-          }).join('')+'</div>')+
+      (partials.length===0?'<p style="color:var(--sub);font-size:11px">No partial sequences detected.</p>':
+        partials.slice(0,15).map(function(e){
+          var sym=e[1][0]&&e[1][0].symbol||'?';
+          var evts=e[1].map(function(r){return r.event;}).join(', ');
+          var tot=e[1].reduce(function(s,r){return s+pnl(r);},0);
+          return '<div class="list-row"><div><span style="color:#1e40af;font-weight:600">#'+e[0]+'</span> <span style="color:var(--sub);font-size:10px">'+sym+'</span></div>'+
+            '<div style="font-size:10px;color:var(--sub)">'+evts+'</div>'+
+            '<div style="font-weight:700;'+(tot>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(tot)+'</div></div>';
+        }).join(''))+
     '</div>'+
   '</div>';
 }
 
 function renderDaily() {
-  var cl = closed();
-  var dayMap = {};
-  cl.forEach(function(t){
-    var d = (t.ts||'').slice(0,10);
-    if(!d)return;
-    if(!dayMap[d]) dayMap[d]={w:0,l:0,total:0,trades:0};
-    dayMap[d].trades++;
-    dayMap[d].total += pnl(t);
-    if(pnl(t)>0) dayMap[d].w++; else dayMap[d].l++;
-  });
-  var days = Object.keys(dayMap).sort();
-  if(!days.length){document.getElementById('tab-daily').innerHTML='<div class="card"><p style="color:var(--sub)">No closed trade data.</p></div>';return;}
-  var running = 0;
-  var maxAbs = Math.max.apply(null, days.map(function(d){return Math.abs(dayMap[d].total);}));
-  var bestDay = days.reduce(function(a,b){return dayMap[a].total>dayMap[b].total?a:b;});
-  var worstDay = days.reduce(function(a,b){return dayMap[a].total<dayMap[b].total?a:b;});
-  var posDays = days.filter(function(d){return dayMap[d].total>0;}).length;
-  var negDays = days.filter(function(d){return dayMap[d].total<0;}).length;
-  document.getElementById('tab-daily').innerHTML =
-  '<div class="kpi-grid">'+
-    kpi('Trading Days', days.length+'', '', 'blue')+
-    kpi('Positive Days', posDays+'', negDays+' negative', 'green')+
-    kpi('Best Day', fmtPnl(dayMap[bestDay].total), bestDay, 'green')+
-    kpi('Worst Day', fmtPnl(dayMap[worstDay].total), worstDay, 'red')+
-    kpi('Avg/Day', fmtPnl(cl.reduce(function(s,t){return s+pnl(t);},0)/days.length), '', 'cyan')+
-  '</div>'+
+  var cl=closed(); var dayMap={};
+  cl.forEach(function(t){var d=(t.ts||'').slice(0,10);if(!d)return;if(!dayMap[d])dayMap[d]={w:0,l:0,total:0,trades:0};dayMap[d].trades++;dayMap[d].total+=pnl(t);if(pnl(t)>0)dayMap[d].w++;else dayMap[d].l++;});
+  var days=Object.keys(dayMap).sort();
+  if(!days.length){document.getElementById('tab-daily').innerHTML='<div class="card"><p style="color:var(--sub)">No data.</p></div>';return;}
+  var running=0;
+  var maxAbs=Math.max.apply(null,days.map(function(d){return Math.abs(dayMap[d].total);}));
+  var bestDay=days.reduce(function(a,b){return dayMap[a].total>dayMap[b].total?a:b;});
+  var worstDay=days.reduce(function(a,b){return dayMap[a].total<dayMap[b].total?a:b;});
+  var posDays=days.filter(function(d){return dayMap[d].total>0;}).length;
+  document.getElementById('tab-daily').innerHTML=
+  '<div class="kpi-grid">'+kpi('Trading Days',days.length+'','','blue')+kpi('Positive Days',posDays+'',days.length-posDays+' negative','green')+
+    kpi('Best Day',fmtPnl(dayMap[bestDay].total),bestDay,'green')+kpi('Worst Day',fmtPnl(dayMap[worstDay].total),worstDay,'red')+
+    kpi('Avg/Day',fmtPnl(cl.reduce(function(s,t){return s+pnl(t);},0)/days.length),'','cyan')+'</div>'+
   '<div class="card"><div class="card-title">Day by Day Performance</div>'+
     days.map(function(d){
-      var row = dayMap[d];
-      running += row.total;
-      var pct = maxAbs>0 ? Math.abs(row.total)/maxAbs*100 : 0;
-      var pos = row.total>=0;
-      return '<div class="day-row">'+
-        '<div class="day-date">'+d.slice(5)+'</div>'+
-        '<div class="day-bar-wrap"><div class="day-bar '+(pos?'pos':'neg')+'" style="width:'+Math.max(pct,8)+'%">'+fmtPnl(row.total)+'</div></div>'+
-        '<div class="day-stats">'+row.trades+'T '+row.w+'W/'+row.l+'L &nbsp; Run: <strong style="'+(running>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(running)+'</strong></div>'+
-      '</div>';
+      var row=dayMap[d]; running+=row.total;
+      var pct=maxAbs>0?Math.abs(row.total)/maxAbs*100:0;
+      var pos=row.total>=0;
+      return '<div class="day-row"><div class="day-date">'+d.slice(5)+'</div>'+
+        '<div class="day-bar-wrap"><div class="day-bar '+(pos?'pos':'neg')+'\" style="width:'+Math.max(pct,8)+'%">' +fmtPnl(row.total)+'</div></div>'+
+        '<div class="day-stats">'+row.trades+'T '+row.w+'W/'+row.l+'L &nbsp; Run: <strong style="'+(running>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(running)+'</strong></div></div>';
     }).join('')+
   '</div>'+
-  '<div class="card"><div class="card-title">Daily Detail Table</div><div class="tbl-wrap"><table>'+
+  '<div class="card"><div class="card-title">Daily Detail</div><div class="tbl-wrap"><table>'+
     '<thead><tr><th>Date</th><th>Trades</th><th>W</th><th>L</th><th>WR%</th><th>Day P&L</th><th>Running Total</th></tr></thead>'+
-    '<tbody>'+(function(){
-      var run2=0;
-      return days.map(function(d){
-        var row=dayMap[d];
-        run2+=row.total;
-        return '<tr><td style="color:var(--sub)">'+d+'</td><td>'+row.trades+'</td>'+
-          '<td class="green">'+row.w+'</td><td class="red">'+row.l+'</td>'+
-          '<td>'+(row.w+row.l?(row.w/(row.w+row.l)*100).toFixed(0)+'%':'--')+'</td>'+
-          '<td style="font-weight:700;'+(row.total>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(row.total)+'</td>'+
-          '<td style="font-weight:700;'+(run2>=0?'color:var(--green)':'color:var(--red)')+'">'+fmtPnl(run2)+'</td></tr>';
-      }).join('');
-    })()+'</tbody></table></div></div>';
+    '<tbody>'+(function(){var run2=0;return days.map(function(d){var row=dayMap[d];run2+=row.total;
+      return '<tr><td style="color:var(--sub)">'+d+'</td><td>'+row.trades+'</td>'+
+        '<td class="green">'+row.w+'</td><td class="red">'+row.l+'</td>'+
+        '<td>'+(row.w+row.l?(row.w/(row.w+row.l)*100).toFixed(0)+'%':'--')+'</td>'+
+        '<td style="font-weight:700;'+(row.total>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(row.total)+'</td>'+
+        '<td style="font-weight:700;'+(run2>=0?'color:var(--green)':'color:var(--red)')+'">' +fmtPnl(run2)+'</td></tr>';
+    }).join('');})()+ '</tbody></table></div></div>';
 }
 
 function renderAnomalies() {
-  var cl = closed();
-  var anomalies = [];
-  var orphans = db.trades.filter(function(t){
-    if(t.event!=='OPEN')return false;
-    return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});
-  });
-  if(orphans.length>0) anomalies.push({type:'warn',label:'Orphaned OPEN Records ('+orphans.length+')',
-    detail:orphans.map(function(t){return t.symbol+' #'+t.ticket+' '+fmtDate(t.ts);}).join(', ')+' &mdash; likely current open positions'});
-  var closeTickets = cl.map(function(t){return t.ticket;}).filter(Boolean);
-  var dups = closeTickets.filter(function(t,i){return closeTickets.indexOf(t)!==i;});
+  var cl=closed(); var anomalies=[];
+  var orphans=db.trades.filter(function(t){if(t.event!=='OPEN')return false;return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});});
+  if(orphans.length>0) anomalies.push({type:'warn',label:'Orphaned OPEN Records ('+orphans.length+')',detail:orphans.map(function(t){return t.symbol+' #'+t.ticket+' '+fmtDate(t.ts);}).join(', ')+' &mdash; likely current positions'});
+  var closeTickets=cl.map(function(t){return t.ticket;}).filter(Boolean);
+  var dups=closeTickets.filter(function(t,i){return closeTickets.indexOf(t)!==i;});
   if(dups.length>0) anomalies.push({type:'warn',label:'Duplicate Close Tickets',detail:[...new Set(dups)].slice(0,5).join(', ')});
-  var missingCurr = cl.filter(function(t){return !t.strong_cur||!t.weak_cur;});
-  if(missingCurr.length>0) anomalies.push({type:'info',label:'Missing strong_cur/weak_cur ('+missingCurr.length+')',
-    detail:'Expected — CLOSE events in v3.74 do not carry currency fields. '+missingCurr.length+'/'+cl.length+' CLOSEs affected. Check OPEN events for currency data.'});
-  var avgWinVal = cl.filter(function(t){return pnl(t)>0;}).reduce(function(s,t){return s+pnl(t);},0)/(cl.filter(function(t){return pnl(t)>0;}).length||1);
-  var bigWins = cl.filter(function(t){return pnl(t)>avgWinVal*2&&pnl(t)>0;});
-  if(bigWins.length>0) anomalies.push({type:'ok',label:'Large Winners ('+bigWins.length+') — TP2 or Trailing',
-    detail:bigWins.slice(0,5).map(function(t){return t.symbol+' '+fmtPnl(pnl(t));}).join(', ')});
-  var lowGap = db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.3;});
-  if(lowGap.length>0) anomalies.push({type:'fail',label:'Signals Below Gap Threshold (<0.3)',
-    detail:lowGap.map(function(s){return s.symbol+' gap='+parseFloat(s.gap).toFixed(3);}).join(', ')});
-  var zeroEntry = cl.filter(function(t){return !t.entry||parseFloat(t.entry)===0;});
-  if(zeroEntry.length>0) anomalies.push({type:'warn',label:'Zero Entry Price ('+zeroEntry.length+')',
-    detail:zeroEntry.slice(0,4).map(function(t){return t.symbol+' #'+t.ticket;}).join(', ')});
+  var missingCurr=cl.filter(function(t){return !t.strong_cur||!t.weak_cur;});
+  if(missingCurr.length>0) anomalies.push({type:'info',label:'Missing strong_cur/weak_cur ('+missingCurr.length+')',detail:'Expected — CLOSE events in v3.74 do not carry currency fields. '+missingCurr.length+'/' +cl.length+' CLOSEs affected.'});
+  var avgWinVal=cl.filter(function(t){return pnl(t)>0;}).reduce(function(s,t){return s+pnl(t);},0)/(cl.filter(function(t){return pnl(t)>0;}).length||1);
+  var bigWins=cl.filter(function(t){return pnl(t)>avgWinVal*2&&pnl(t)>0;});
+  if(bigWins.length>0) anomalies.push({type:'ok',label:'Large Winners ('+bigWins.length+') — TP2 or Trailing',detail:bigWins.slice(0,5).map(function(t){return t.symbol+' '+fmtPnl(pnl(t));}).join(', ')});
+  var lowGap=db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.3;});
+  if(lowGap.length>0) anomalies.push({type:'fail',label:'Signals Below Gap Threshold (<0.3)',detail:lowGap.map(function(s){return s.symbol+' gap='+parseFloat(s.gap).toFixed(3);}).join(', ')});
   if(anomalies.length===0) anomalies.push({type:'ok',label:'No anomalies detected',detail:'All checks passed.'});
-  document.getElementById('tab-anomalies').innerHTML =
-  '<div class="card"><div class="card-title">Anomaly Report <span class="badge '+(anomalies.some(function(a){return a.type==='fail';})?'fail':anomalies.some(function(a){return a.type==='warn';})?'warn':'ok')+'">'+anomalies.length+' items</span></div>'+
+  document.getElementById('tab-anomalies').innerHTML=
+  '<div class="card"><div class="card-title">Anomaly Report <span class="badge '+(anomalies.some(function(a){return a.type==='fail';})?'fail':anomalies.some(function(a){return a.type==='warn';})?'warn':'ok')+'">' +anomalies.length+' items</span></div>'+
   '<div class="check-grid">'+anomalies.map(function(a){
     return '<div class="check-row"><div class="check-icon">'+(a.type==='ok'?'&#10003;':a.type==='warn'?'&#9888;':a.type==='info'?'&#9432;':'&#10007;')+'</div>'+
       '<div><div class="check-label">'+a.label+'</div><div class="check-detail">'+a.detail+'</div></div></div>';
@@ -605,140 +531,92 @@ function renderAnomalies() {
 }
 
 function exportReport() {
-  var cl = closed();
-  var wins = cl.filter(function(t){return pnl(t)>0;});
-  var losses = cl.filter(function(t){return pnl(t)<0;});
-  var totalPnl = cl.reduce(function(s,t){return s+pnl(t);},0);
-  var wr = cl.length ? (wins.length/cl.length*100) : 0;
-  var avgW = wins.length ? wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length : 0;
-  var avgL = losses.length ? Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length) : 0;
-  var rrRatio = avgL>0 ? avgW/avgL : 0;
-  var grossW = wins.reduce(function(s,t){return s+pnl(t);},0);
-  var grossL = Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));
-  var pf = grossL>0 ? grossW/grossL : 0;
-  var buys = cl.filter(function(t){return (t.direction||'').toUpperCase()==='BUY';});
-  var sells = cl.filter(function(t){return (t.direction||'').toUpperCase()==='SELL';});
-  var buyWins = buys.filter(function(t){return pnl(t)>0;});
-  var sellWins = sells.filter(function(t){return pnl(t)>0;});
-  var buyPnl = buys.reduce(function(s,t){return s+pnl(t);},0);
-  var sellPnl = sells.reduce(function(s,t){return s+pnl(t);},0);
-  var checks = getHealthChecks();
-  var pairMap = {};
-  cl.forEach(function(t){
-    var s=t.symbol||'?';
-    if(!pairMap[s])pairMap[s]={w:0,l:0,total:0};
-    if(pnl(t)>0)pairMap[s].w++;else pairMap[s].l++;
-    pairMap[s].total+=pnl(t);
-  });
-  var pairArr = Object.keys(pairMap).map(function(s){return {sym:s,w:pairMap[s].w,l:pairMap[s].l,total:pairMap[s].total};});
+  var cl=closed();
+  var wins=cl.filter(function(t){return pnl(t)>0;});
+  var losses=cl.filter(function(t){return pnl(t)<0;});
+  var totalPnl=cl.reduce(function(s,t){return s+pnl(t);},0);
+  var wr=cl.length?(wins.length/cl.length*100):0;
+  var avgW=wins.length?wins.reduce(function(s,t){return s+pnl(t);},0)/wins.length:0;
+  var avgL=losses.length?Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0)/losses.length):0;
+  var rrRatio=avgL>0?avgW/avgL:0;
+  var grossW=wins.reduce(function(s,t){return s+pnl(t);},0);
+  var grossL=Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));
+  var pf=grossL>0?grossW/grossL:0;
+  var buys=cl.filter(function(t){return(t.direction||'').toUpperCase()==='BUY';});
+  var sells=cl.filter(function(t){return(t.direction||'').toUpperCase()==='SELL';});
+  var buyWins=buys.filter(function(t){return pnl(t)>0;});
+  var sellWins=sells.filter(function(t){return pnl(t)>0;});
+  var buyPnl=buys.reduce(function(s,t){return s+pnl(t);},0);
+  var sellPnl=sells.reduce(function(s,t){return s+pnl(t);},0);
+  var checks=getHealthChecks();
+  var pairMap={};
+  cl.forEach(function(t){var s=t.symbol||'?';if(!pairMap[s])pairMap[s]={w:0,l:0,total:0};if(pnl(t)>0)pairMap[s].w++;else pairMap[s].l++;pairMap[s].total+=pnl(t);});
+  var pairArr=Object.keys(pairMap).map(function(s){return {sym:s,w:pairMap[s].w,l:pairMap[s].l,total:pairMap[s].total};});
   pairArr.sort(function(a,b){return b.total-a.total;});
-  var dayMap = {};
-  cl.forEach(function(t){
-    var d=(t.ts||'').slice(0,10);
-    if(!d)return;
-    if(!dayMap[d])dayMap[d]={w:0,l:0,total:0,trades:0};
-    dayMap[d].trades++;dayMap[d].total+=pnl(t);
-    if(pnl(t)>0)dayMap[d].w++;else dayMap[d].l++;
-  });
-  var days = Object.keys(dayMap).sort();
-  var openedSigs = db.signals.filter(function(s){return s.result==='OPENED';});
-  var blocked = db.signals.filter(function(s){return s.result!=='OPENED'&&s.result!=='WAITING';});
-  var reasons = {};
-  blocked.forEach(function(s){var r=s.block_reason||s.result||'Unknown';reasons[r]=(reasons[r]||0)+1;});
-  var now = new Date().toISOString().slice(0,16).replace('T',' ');
-  var lines = [];
-  lines.push('=== CSEA HEALTH ANALYSER REPORT ===');
-  lines.push('Generated : '+now+' UTC');
-  lines.push('Account   : '+g_acctLabel);
-  lines.push('Period    : '+g_periodLabel);
-  lines.push('');
-  lines.push('--- OVERVIEW ---');
-  lines.push('Total P&L    : '+fmtPnl(totalPnl));
-  lines.push('Trades       : '+cl.length+' closed ('+wins.length+'W / '+losses.length+'L)');
-  lines.push('Win Rate     : '+wr.toFixed(1)+'%');
-  lines.push('Avg Win      : +'+avgW.toFixed(2));
-  lines.push('Avg Loss     : -'+avgL.toFixed(2));
-  lines.push('R:R Ratio    : '+rrRatio.toFixed(2)+'x');
-  lines.push('Profit Factor: '+(pf>0?pf.toFixed(2):'n/a'));
-  if(cl.length){
-    var best=cl.reduce(function(a,b){return pnl(a)>pnl(b)?a:b;});
-    var worst=cl.reduce(function(a,b){return pnl(a)<pnl(b)?a:b;});
-    lines.push('Best Trade   : '+best.symbol+' '+(best.direction||'')+' '+fmtPnl(pnl(best)));
-    lines.push('Worst Trade  : '+worst.symbol+' '+(worst.direction||'')+' '+fmtPnl(pnl(worst)));
-  }
-  lines.push('');
-  lines.push('--- DIRECTION SPLIT ---');
-  lines.push('BUY  : '+buys.length+'T '+buyWins.length+'W/'+(buys.length-buyWins.length)+'L'+(buys.length?' '+( buyWins.length/buys.length*100).toFixed(1)+'% WR':'')+' | Total: '+fmtPnl(buyPnl)+' | Avg: '+(buys.length?fmtPnl(buyPnl/buys.length):'--'));
-  lines.push('SELL : '+sells.length+'T '+sellWins.length+'W/'+(sells.length-sellWins.length)+'L'+(sells.length?' '+(sellWins.length/sells.length*100).toFixed(1)+'% WR':'')+' | Total: '+fmtPnl(sellPnl)+' | Avg: '+(sells.length?fmtPnl(sellPnl/sells.length):'--'));
-  lines.push('');
-  lines.push('--- HEALTH CHECKS ---');
+  var dayMap={};
+  cl.forEach(function(t){var d=(t.ts||'').slice(0,10);if(!d)return;if(!dayMap[d])dayMap[d]={w:0,l:0,total:0,trades:0};dayMap[d].trades++;dayMap[d].total+=pnl(t);if(pnl(t)>0)dayMap[d].w++;else dayMap[d].l++;});
+  var days=Object.keys(dayMap).sort();
+  var openedSigs=db.signals.filter(function(s){return s.result==='OPENED';});
+  var blocked=db.signals.filter(function(s){return s.result!=='OPENED'&&s.result!=='WAITING';});
+  var reasons={};blocked.forEach(function(s){var r=s.block_reason||s.result||'Unknown';reasons[r]=(reasons[r]||0)+1;});
+  var now=new Date().toISOString().slice(0,16).replace('T',' ');
+  var L=[];
+  L.push('=== CSEA HEALTH ANALYSER REPORT ===');
+  L.push('Generated : '+now+' UTC');
+  L.push('Account   : '+g_acctLabel);
+  L.push('Period    : '+g_periodLabel);
+  L.push('');
+  L.push('--- OVERVIEW ---');
+  L.push('Total P&L    : '+fmtPnl(totalPnl));
+  L.push('Trades       : '+cl.length+' closed ('+wins.length+'W / '+losses.length+'L)');
+  L.push('Win Rate     : '+wr.toFixed(1)+'%');
+  L.push('Avg Win      : +'+avgW.toFixed(2));
+  L.push('Avg Loss     : -'+avgL.toFixed(2));
+  L.push('R:R Ratio    : '+rrRatio.toFixed(2)+'x');
+  L.push('Profit Factor: '+(pf>0?pf.toFixed(2):'n/a'));
+  if(cl.length){var best=cl.reduce(function(a,b){return pnl(a)>pnl(b)?a:b;});var worst=cl.reduce(function(a,b){return pnl(a)<pnl(b)?a:b;});
+    L.push('Best Trade   : '+best.symbol+' '+(best.direction||'')+' '+fmtPnl(pnl(best)));
+    L.push('Worst Trade  : '+worst.symbol+' '+(worst.direction||'')+' '+fmtPnl(pnl(worst)));}
+  L.push('');L.push('--- DIRECTION SPLIT ---');
+  L.push('BUY  : '+buys.length+'T '+buyWins.length+'W/'+(buys.length-buyWins.length)+'L'+(buys.length?' '+(buyWins.length/buys.length*100).toFixed(1)+'% WR':'')+' | Total: '+fmtPnl(buyPnl)+' | Avg: '+(buys.length?fmtPnl(buyPnl/buys.length):'--'));
+  L.push('SELL : '+sells.length+'T '+sellWins.length+'W/'+(sells.length-sellWins.length)+'L'+(sells.length?' '+(sellWins.length/sells.length*100).toFixed(1)+'% WR':'')+' | Total: '+fmtPnl(sellPnl)+' | Avg: '+(sells.length?fmtPnl(sellPnl/sells.length):'--'));
+  L.push('');L.push('--- HEALTH CHECKS ---');
   checks.forEach(function(c){
-    var icon = c.status==='ok'?'[OK] ':c.status==='warn'?'[!!] ':c.status==='info'?'[i]  ':'[XX] ';
-    var detail = c.detail.replace(/&mdash;/g,'--').replace(/&middot;/g,'.').replace(/&#10003;/g,'OK').replace(/&ge;/g,'>=').replace(/<[^>]+>/g,'');
-    lines.push(icon+c.label+': '+detail);
-  });
-  lines.push('');
-  lines.push('--- DAILY PERFORMANCE ---');
-  lines.push('Date       | T  | W  | L  | Day P&L  | Running');
-  lines.push('-----------+----+----+----+----------+----------');
+    var icon=c.status==='ok'?'[OK] ':c.status==='warn'?'[!!] ':c.status==='info'?'[i]  ':'[XX] ';
+    var det=c.detail.replace(/&mdash;/g,'--').replace(/&middot;/g,'.').replace(/&#\d+;/g,'').replace(/<[^>]+>/g,'');
+    L.push(icon+c.label+': '+det);});
+  L.push('');L.push('--- DAILY PERFORMANCE ---');
+  L.push('Date       | T  | W  | L  | Day P&L  | Running');
+  L.push('-----------+----+----+----+----------+---------');
   var run=0;
-  days.forEach(function(d){
-    var r=dayMap[d]; run+=r.total;
-    lines.push(
-      d+'  | '+pad(r.trades,2)+' | '+pad(r.w,2)+' | '+pad(r.l,2)+' | '+padL(fmtPnl(r.total),8)+' | '+padL(fmtPnl(run),9)
-    );
-  });
-  lines.push('');
-  lines.push('--- PAIR PERFORMANCE ---');
-  lines.push('Pair     | T  | W  | L  | WR%   | Total P&L');
-  lines.push('---------+----+----+----+-------+----------');
-  pairArr.forEach(function(r){
-    var cnt=r.w+r.l;
-    lines.push(padR(r.sym,8)+' | '+pad(cnt,2)+' | '+pad(r.w,2)+' | '+pad(r.l,2)+' | '+padL((cnt?(r.w/cnt*100).toFixed(0)+'%':'--'),5)+' | '+fmtPnl(r.total));
-  });
-  lines.push('');
-  lines.push('--- SIGNAL INTEGRITY ---');
-  lines.push('Total signals  : '+db.signals.length);
-  lines.push('Opened         : '+openedSigs.length);
-  lines.push('Blocked/other  : '+blocked.length);
-  if(Object.keys(reasons).length){
-    lines.push('Block reasons:');
-    Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).forEach(function(r){lines.push('  '+r[0]+': '+r[1]);});
-  }
-  lines.push('');
-  lines.push('--- ANOMALIES ---');
-  var orphans=db.trades.filter(function(t){if(t.event!=='OPEN')return false;return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});});
-  if(orphans.length) lines.push('[!!] Orphaned OPENs: '+orphans.length+' (likely current positions)');
+  days.forEach(function(d){var r=dayMap[d];run+=r.total;
+    L.push(d+'  | '+pad(r.trades,2)+' | '+pad(r.w,2)+' | '+pad(r.l,2)+' | '+padL(fmtPnl(r.total),8)+' | '+padL(fmtPnl(run),8));});
+  L.push('');L.push('--- PAIR PERFORMANCE ---');
+  L.push('Pair     | T  | W  | L  | WR%   | Total');
+  L.push('---------+----+----+----+-------+-------');
+  pairArr.forEach(function(r){var cnt=r.w+r.l;
+    L.push(padR(r.sym,8)+' | '+pad(cnt,2)+' | '+pad(r.w,2)+' | '+pad(r.l,2)+' | '+padL((cnt?(r.w/cnt*100).toFixed(0)+'%':'--'),5)+' | '+fmtPnl(r.total));});
+  L.push('');L.push('--- SIGNAL INTEGRITY ---');
+  L.push('Total: '+db.signals.length+' | Opened: '+openedSigs.length+' | Blocked: '+blocked.length);
+  if(Object.keys(reasons).length){L.push('Block reasons:');Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).forEach(function(r){L.push('  '+r[0]+': '+r[1]);});}
+  L.push('');L.push('--- ANOMALIES ---');
+  var orphs=db.trades.filter(function(t){if(t.event!=='OPEN')return false;return !db.trades.some(function(c){return c.ticket===t.ticket&&(c.event==='CLOSE'||c.event==='COMPOUND_CLOSE');});});
+  if(orphs.length) L.push('[!!] Orphaned OPENs: '+orphs.length+' (likely current positions)');
   var missC=cl.filter(function(t){return !t.strong_cur||!t.weak_cur;});
-  if(missC.length) lines.push('[i]  Missing currency fields: '+missC.length+'/'+cl.length+' (expected in v3.74 CLOSEs)');
-  var lgap=db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.3;});
-  if(lgap.length) lines.push('[XX] Signals below gap threshold: '+lgap.length);
-  else lines.push('[OK] No signals below gap threshold');
-  lines.push('');
-  lines.push('=== END REPORT ===');
-  var text = lines.join('\n');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function(){showToast();}).catch(function(){fallbackCopy(text);});
-  } else { fallbackCopy(text); }
+  if(missC.length) L.push('[i]  Missing currency fields: '+missC.length+'/' +cl.length+' (expected in v3.74 CLOSEs)');
+  var lg=db.signals.filter(function(s){return s.result==='OPENED'&&parseFloat(s.gap||1)<0.3;});
+  L.push(lg.length?'[XX] Signals below gap threshold: '+lg.length:'[OK] No signals below gap threshold');
+  L.push('');L.push('=== END REPORT ===');
+  var text=L.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast();}).catch(function(){fallbackCopy(text);});}
+  else{fallbackCopy(text);}
 }
 
-function pad(n, w) { var s=String(n); while(s.length<w)s=' '+s; return s; }
-function padL(s, w) { while(s.length<w)s=' '+s; return s; }
-function padR(s, w) { while(s.length<w)s=s+' '; return s; }
-
-function fallbackCopy(text) {
-  var ta = document.createElement('textarea');
-  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
-  document.body.appendChild(ta); ta.select();
-  document.execCommand('copy'); document.body.removeChild(ta);
-  showToast();
-}
-
-function showToast() {
-  var t = document.getElementById('toast');
-  t.style.display = 'block';
-  setTimeout(function(){t.style.display='none';}, 2500);
-}
+function pad(n,w){var s=String(n);while(s.length<w)s=' '+s;return s;}
+function padL(s,w){while(s.length<w)s=' '+s;return s;}
+function padR(s,w){while(s.length<w)s=s+' ';return s;}
+function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast();}
+function showToast(){var t=document.getElementById('toast');t.style.display='block';setTimeout(function(){t.style.display='none';},2500);}
 
 init();
 </script>
