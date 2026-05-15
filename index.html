@@ -447,7 +447,7 @@ function renderManagement() {
   '<div class="kpi-grid">'+kpi('Avg Win','+' +avgW.toFixed(2),'','green')+kpi('Avg Loss','-'+avgL.toFixed(2),'','red')+
     kpi('W/L Ratio',rrRatio.toFixed(2)+'x',rrRatio>=1?'Favourable':'Inverted — WR compensates',rrRatio>=1?'green':'gold')+
     kpi('Partial Closes',partials.length+'','Multi-row tickets','blue')+
-    kpi('Profit Factor',(function(){var g=wins.reduce(function(s,t){return s+pnl(t);},0);var b=Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));return b>0?(g/b).toFixed(2):'&infin;';})(),'','cyan')+'</div>'+
+    kpi('Profit Factor',(function(){var g=wins.reduce(function(s,t){return s+pnl(t);},0);var b=Math.abs(losses.reduce(function(s,t){return s+pnl(t);},0));return b>0?(g/b).toFixed(2):'&infin;';})()','','cyan')+'</div>'+
   '<div class="two-col">'+
     '<div class="card"><div class="card-title">Pair Performance</div><div class="tbl-wrap"><table>'+
       '<thead><tr><th>Pair</th><th>W</th><th>L</th><th>WR%</th><th>Total P&L</th><th>Avg</th></tr></thead>'+
